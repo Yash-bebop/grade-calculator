@@ -1,0 +1,22 @@
+{
+  "name": "grade-calculator",
+  "version": "6.0.0",
+  "description": "Doon University Grade Calculator",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'No build step required for vanilla HTML project'",
+    "lint": "echo 'No linter configured'",
+    "test": "echo 'No tests configured'"
+  },
+  "dependencies": {
+    "@vercel/speed-insights": "^1.0.12"
+  },
+  "keywords": [
+    "grade-calculator",
+    "university",
+    "education"
+  ],
+  "author": "",
+  "license": "ISC"
+}
