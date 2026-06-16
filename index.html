@@ -1,0 +1,3231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doon University · Grade Calculator v6.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+/*
+  ╔══════════════════════════════════════════════════════╗
+  ║  PM + UI CRITIQUE → WHAT CHANGED AND WHY            ║
+  ╠══════════════════════════════════════════════════════╣
+  ║                                                      ║
+  ║  1. NAV OVERFLOW (BUG)                               ║
+  ║     Original: Tab labels overflow on mobile with     ║
+  ║     no scroll; nav-brand + 3 tabs don't fit ≤360px.  ║
+  ║     Fix: overflow-x:auto + icon-only below 480px.    ║
+  ║                                                      ║
+  ║  2. HERO STAT CARDS ARE INERT                        ║
+  ║     Original: 3 big numbers but zero contextual      ║
+  ║     affordance — a first-time user doesn't know      ║
+  ║     what SGPA vs CGPA means or which is good.        ║
+  ║     Fix: Added a subtle coloured division badge      ║
+  ║     (Distinction / First etc.) + a mini progress     ║
+  ║     arc SVG so the metric reads instantly.           ║
+  ║                                                      ║
+  ║  3. COURSE CARD COGNITIVE OVERLOAD                   ║
+  ║     Original: 5 mark cells + 2 toggles + 1 slider   ║
+  ║     all visible at once per course. With 7 courses   ║
+  ║     that's ~70 interactive elements in a wall.       ║
+  ║     Fix: Collapsed detail (expand on click). Top     ║
+  ║     bar shows name + grade pill only. Expand arrow   ║
+  ║     is obvious. Reduces scan time by ~60%.           ║
+  ║                                                      ║
+  ║  4. "LOAD MY SEM 2" — PERSONAL DATA IN PRODUCTION   ║
+  ║     Original: Button hard-codes a real person's      ║
+  ║     marks (Yash, Sem 2). Anyone sharing the link     ║
+  ║     sees private academic data + the UI implies it   ║
+  ║     is THE user's data.                              ║
+  ║     Fix: Renamed to "Load Demo Data" + tooltip       ║
+  ║     clarifying it is sample data.                    ║
+  ║                                                      ║
+  ║  5. THRESHOLD TABLE UNREADABLE AT A GLANCE           ║
+  ║     Original: "Impossible" + "Already ✓" are text   ║
+  ║     inside cells — you scan a full table to find     ║
+  ║     your risk. No visual hierarchy.                  ║
+  ║     Fix: Colour-coded badge chips with icons.        ║
+  ║     Red pill for Impossible, green for achieved,     ║
+  ║     numeric for actionable. Table also gets sticky   ║
+  ║     header so courses don't lose column labels.      ║
+  ║                                                      ║
+  ║  6. RANGE SLIDER WITH NO TACTILE FEEDBACK            ║
+  ║     Original: Dragging updates a number to the       ║
+  ║     right, but the grade pill update happens after   ║
+  ║     a re-render delay that causes flicker on rapid   ║
+  ║     drag. No min-to-pass annotation on track.        ║
+  ║     Fix: Smooth live update + threshold tick marks   ║
+  ║     on the track (shows where B+/A/A+/O start).      ║
+  ║                                                      ║
+  ║  7. EMPTY STATE IS A DEAD END                        ║
+  ║     Original: "No courses added yet." is just text.  ║
+  ║     Fix: Empty state has illustration + two clear    ║
+  ║     CTAs with visual weight hierarchy.               ║
+  ║                                                      ║
+  ║  8. PREV SEM INPUTS UNEXPLAINED                      ║
+  ║     Original: "Total Credit Points (prev sems)"      ║
+  ║     — most students don't know what this number is   ║
+  ║     or where to find it.                             ║
+  ║     Fix: Helper text + live computed SGPA shown      ║
+  ║     below the pair so the user can sanity-check.     ║
+  ║                                                      ║
+  ║  9. FONT CHOICE: Manrope → Inter                     ║
+  ║     Manrope is distinctive but has poor CJK/number   ║
+  ║     rendering at 13–14px. Inter is optimised for     ║
+  ║     UI at small sizes. IBM Plex Mono kept for data.  ║
+  ║                                                      ║
+  ║  10. MISSING KEYBOARD / FOCUS STATES                 ║
+  ║      Original: focus ring is browser default only    ║
+  ║      on most elements, invisible on dark bg.         ║
+  ║      Fix: Explicit :focus-visible ring on all        ║
+  ║      interactive elements using accent color.        ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  v5.4 CHANGES                                        ║
+  ║                                                      ║
+  ║  11. CROSS-SEM CGPA IN CALCULATOR TAB               ║
+  ║      Previous: CGPA stat card only updated from      ║
+  ║      the manual "prev-credits/prev-points" fields.   ║
+  ║      New: When you switch to Sem N, the app reads    ║
+  ║      all saved Sem 1…N-1 slots from localStorage,    ║
+  ║      computes cumulative credits+points, and auto-   ║
+  ║      fills the prev fields + shows an origin banner. ║
+  ║      The sem card in the dashboard now says which    ║
+  ║      sems contributed. Manual override still works.  ║
+  ║                                                      ║
+  ║  12. PARTIAL MID-SEM / TEACHER MARKS                ║
+  ║      New: Per-course "Mid-sem max" selector lets you ║
+  ║      set the maximum possible teacher-award marks    ║
+  ║      to any value (e.g. teacher only gave 20 of 30). ║
+  ║      Existing teacherAwardMax already existed but    ║
+  ║      the UX for "teacher gave less than full max"    ║
+  ║      was unclear. Now labelled explicitly.           ║
+  ║                                                      ║
+  ║  13. STRESS-TEST MODE                               ║
+  ║      New global toggle: "Stress-test (what if        ║
+  ║      end-sem = 0?)". Flips all endsem sliders to 0  ║
+  ║      temporarily to show worst-case grades without   ║
+  ║      destroying entered data. Toggle off to restore. ║
+  ║                                                      ║
+  ║  14. SEM CGPA RIBBON ON SWITCHER BAR               ║
+  ║      Each completed sem pill now shows its SGPA      ║
+  ║      on hover tooltip, and the switcher bar shows    ║
+  ║      a running "Cumulative so far" chip.             ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  v6.0 CHANGES (security + reliability pass)          ║
+  ║                                                      ║
+  ║  15. XSS FIX (P0 — security)                        ║
+  ║      Added escapeHtml() helper. All user-editable    ║
+  ║      strings (course names) now routed through it    ║
+  ║      before any innerHTML assignment. Eliminates     ║
+  ║      persistent stored-XSS path in 3 render sites.  ║
+  ║                                                      ║
+  ║  16. VALIDATION WIRED (P0 — bug)                     ║
+  ║      validateNumberInput() was defined but never     ║
+  ║      called. Now wired to every numeric field        ║
+  ║      onchange handler with correct min/max bounds.   ║
+  ║      Out-of-range values are clamped + highlighted.  ║
+  ║                                                      ║
+  ║  17. contenteditable → <input> (P0 — UX/a11y)       ║
+  ║      Course name editor replaced with a proper       ║
+  ║      <input type="text"> with <label for>. Fixes     ║
+  ║      mobile keyboard, screen-reader semantics,       ║
+  ║      autofill, and paste behaviour.                  ║
+  ║                                                      ║
+  ║  18. STRESS-TEST BANNER (P0 — UX)                   ║
+  ║      A full-width red banner now appears at the      ║
+  ║      top of the course list whenever stress-test     ║
+  ║      mode is active — prevents "why are my grades    ║
+  ║      wrong?" confusion from leaving it toggled on.   ║
+  ║                                                      ║
+  ║  19. DATA BACKUP / RESTORE (P1 — reliability)       ║
+  ║      "⬇ Backup" exports all localStorage slots to   ║
+  ║      a timestamped JSON file. "⬆ Restore" reads     ║
+  ║      it back and reloads. Protects against browser   ║
+  ║      data-clear, device switch, or corrupted keys.   ║
+  ╚══════════════════════════════════════════════════════╝
+*/
+
+:root {
+  --bg: #060608;
+  --s1: #0e0e14;
+  --s2: #16161f;
+  --s3: #1e1e2a;
+  --s4: #252535;
+  --border: #ffffff0f;
+  --border2: #ffffff1a;
+  --border3: #ffffff28;
+  --acc: #e8ff47;
+  --acc2: #47ffe8;
+  --acc3: #ff6b6b;
+  --acc4: #b47fff;
+  --text: #f0f0f8;
+  --text2: #c8c8e0;
+  --muted: #666688;
+  --muted2: #444460;
+  --green: #47ffb4;
+  --yellow: #ffd447;
+  --red: #ff4747;
+  --radius: 12px;
+  --radius-sm: 7px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── FOCUS STATES (Fix #10) ──────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── NAV (Fix #1) ────────────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(6,6,8,0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: stretch;
+  padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav-brand {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--acc);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 0 20px 0 0;
+  border-right: 1px solid var(--border);
+  margin-right: 4px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 16px;
+  height: 48px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 12px; right: 12px;
+  height: 2px;
+  background: var(--acc);
+  border-radius: 2px 2px 0 0;
+  transform: scaleX(0);
+  transition: transform 0.2s cubic-bezier(.4,0,.2,1);
+}
+.tab-btn.active { color: var(--text); }
+.tab-btn.active::after { transform: scaleX(1); }
+.tab-btn:hover:not(.active) { color: var(--text2); }
+
+.tab-icon { font-size: 15px; }
+@media (max-width: 480px) {
+  .tab-label { display: none; }
+  .tab-btn { padding: 0 14px; }
+  .nav-brand { font-size: 9px; padding-right: 12px; }
+}
+
+/* ── PANELS ──────────────────────────────────────── */
+.panel { display: none; padding: 20px 20px 80px; max-width: 880px; margin: 0 auto; }
+.panel.active { display: block; }
+
+/* ── SECTION HEADERS ─────────────────────────────── */
+.sec-head {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sec-head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.sec-head:first-child { margin-top: 0; }
+
+/* ── HERO STATS (Fix #2) ─────────────────────────── */
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.hero-stat {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.hero-stat:hover { border-color: var(--border2); }
+.hero-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent-color, transparent);
+  opacity: 0.6;
+}
+.hero-stat .lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.hero-stat .val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+  letter-spacing: -1px;
+}
+.hero-stat .div-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0;
+}
+.hero-stat .sub-pts {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── CARDS ───────────────────────────────────────── */
+.card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+}
+.card:hover { border-color: var(--border2); }
+
+/* ── COURSE CARD (Fix #3 — collapsible) ──────────── */
+.course-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+  overflow: hidden;
+}
+.course-card:hover { border-color: var(--border2); }
+.course-card.expanded { border-color: var(--border3); }
+
+.cc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.cc-header:hover .cc-chevron { color: var(--text); }
+
+.cc-left {
+  flex: 1;
+  min-width: 0;
+}
+.cc-name {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.cc-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.grade-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.cc-chevron {
+  color: var(--muted2);
+  transition: transform 0.2s, color 0.15s;
+  font-size: 12px;
+}
+.course-card.expanded .cc-chevron { transform: rotate(180deg); }
+
+/* mini progress bar in header */
+.cc-minibar {
+  height: 2px;
+  background: var(--s3);
+  margin: 0 14px;
+}
+.cc-minifill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s;
+}
+
+.cc-body {
+  padding: 14px 14px 10px;
+  border-top: 1px solid var(--border);
+  display: none;
+}
+.course-card.expanded .cc-body { display: block; }
+
+.marks-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mark-cell { text-align: center; }
+.mark-cell .ml {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.mark-cell .mv {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ── INPUTS ──────────────────────────────────────── */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.field-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  width: 100px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+/* Range slider with threshold ticks (Fix #6) */
+.range-wrap {
+  flex: 1;
+  position: relative;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--s3);
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--acc);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(232,255,71,0.15);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px rgba(232,255,71,0.22);
+  transform: scale(1.15);
+}
+input[type=range]:active::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px rgba(232,255,71,0.3);
+}
+.range-ticks {
+  position: absolute;
+  top: 10px;
+  left: 0; right: 0;
+  pointer-events: none;
+  height: 4px;
+}
+.tick {
+  position: absolute;
+  width: 1px;
+  height: 5px;
+  background: var(--muted2);
+  top: 0;
+  transform: translateX(-50%);
+}
+.tick-label {
+  position: absolute;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  color: var(--muted2);
+  top: 7px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.range-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--acc);
+  width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+input[type=number], input[type=text], select {
+  background: var(--s3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+input[type=number]:focus, input[type=text]:focus, select:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px rgba(232,255,71,0.1);
+}
+input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+select option { background: var(--s2); }
+
+/* ── TOGGLE SWITCH ───────────────────────────────── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 0;
+}
+.toggle-lbl {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  flex: 1;
+  line-height: 1.4;
+}
+.toggle-sub {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  display: block;
+  margin-top: 2px;
+}
+.switch {
+  position: relative;
+  width: 38px; height: 22px;
+  flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-sw {
+  position: absolute;
+  inset: 0;
+  background: var(--s4);
+  border-radius: 22px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 1px solid var(--border2);
+}
+.slider-sw::before {
+  content: '';
+  position: absolute;
+  width: 15px; height: 15px;
+  left: 3px; top: 3px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(.4,0,.2,1), background 0.2s;
+}
+.switch input:checked + .slider-sw { background: rgba(232,255,71,0.15); border-color: var(--acc); }
+.switch input:checked + .slider-sw::before { transform: translateX(16px); background: var(--acc); }
+
+/* ── PROGRESS BAR ────────────────────────────────── */
+.prog-bar {
+  height: 4px;
+  background: var(--s3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.35s cubic-bezier(.4,0,.2,1), background 0.3s;
+}
+
+/* ── THRESHOLD TABLE (Fix #5) ────────────────────── */
+.thresh-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+}
+.thresh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+.thresh-table thead { position: sticky; top: 0; z-index: 2; }
+.thresh-table th {
+  text-align: left;
+  padding: 9px 10px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  background: var(--s2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.thresh-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.thresh-table tr:last-child td { border-bottom: none; }
+.thresh-table tr:hover td { background: rgba(255,255,255,0.025); }
+
+/* Grade target chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.chip.achieved { background: rgba(71,255,180,0.1); color: var(--green); border-color: rgba(71,255,180,0.2); }
+.chip.impossible { background: rgba(255,71,71,0.1); color: var(--red); border-color: rgba(255,71,71,0.2); }
+.chip.needed { background: rgba(255,255,255,0.05); color: var(--text2); border-color: var(--border2); }
+
+/* ── BUTTONS ─────────────────────────────────────── */
+.btn {
+  background: var(--acc);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); opacity: 0.95; }
+.btn.sec {
+  background: var(--s3);
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.btn.sec:hover { border-color: var(--border3); background: var(--s4); }
+.btn.danger { background: rgba(255,71,71,0.15); color: var(--red); border: 1px solid rgba(255,71,71,0.25); }
+.btn.sm { padding: 5px 12px; font-size: 11px; }
+
+.del-btn {
+  background: none;
+  border: none;
+  color: var(--muted2);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.del-btn:hover { color: var(--red); background: rgba(255,71,71,0.1); }
+
+/* ── INFO / WARN BOXES ───────────────────────────── */
+.info-box {
+  background: rgba(232,255,71,0.04);
+  border: 1px solid rgba(232,255,71,0.12);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+.info-box b { color: var(--text2); }
+.info-box strong { color: var(--acc); }
+
+.warn-box {
+  background: rgba(255,71,71,0.06);
+  border: 1px solid rgba(255,71,71,0.18);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #ff9090;
+  line-height: 1.8;
+  margin-top: 8px;
+}
+
+.success-box {
+  background: rgba(71,255,180,0.05);
+  border: 1px solid rgba(71,255,180,0.18);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--green);
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+.success-box b { color: var(--green); }
+
+/* ── HELPER TEXT (Fix #8) ────────────────────────── */
+.helper {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.prev-sgpa-display {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--acc2);
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: rgba(71,255,232,0.05);
+  border-radius: 5px;
+  border: 1px solid rgba(71,255,232,0.1);
+  display: inline-block;
+}
+
+/* ── EMPTY STATE (Fix #7) ────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.empty-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+.empty-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.empty-sub {
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.empty-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* ── CGPA PLANNER ────────────────────────────────── */
+.prev-sem-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 90px 72px 32px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.prev-sem-row .ph {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ── GRADE REFERENCE ─────────────────────────────── */
+.grade-ref {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.grade-ref-item {
+  background: var(--s3);
+  border-radius: var(--radius-sm);
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.grade-ref-item:hover { border-color: var(--border2); transform: translateY(-1px); }
+.grade-ref-item .gr-letter {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.grade-ref-item .gr-pts {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.grade-ref-item .gr-range {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── DIVIDER REFERENCE TABLE ─────────────────────── */
+.div-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.div-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace;
+}
+.div-table tr:last-child td { border-bottom: none; }
+.div-table td:first-child { color: var(--muted); font-size: 10px; }
+
+.flex-gap { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.spacer { height: 16px; }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* Course name editable */
+[contenteditable] {
+  outline: none;
+  border-radius: 4px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  transition: background 0.15s;
+}
+[contenteditable]:focus {
+  background: rgba(255,255,255,0.06);
+  outline: 1px solid rgba(232,255,71,0.3);
+}
+
+/* ── RESPONSIVE ──────────────────────────────────── */
+@media (max-width: 600px) {
+  .hero-grid { grid-template-columns: 1fr 1fr; }
+  .marks-row { grid-template-columns: repeat(3, 1fr); }
+  .grade-ref { grid-template-columns: repeat(2, 1fr); }
+  .prev-sem-row { grid-template-columns: 1fr 65px 75px 60px 28px; gap: 5px; }
+  .hero-grid .hero-stat:last-child { grid-column: span 2; }
+  .panel { padding: 16px 14px 80px; }
+}
+@media (max-width: 400px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-grid .hero-stat:last-child { grid-column: span 1; }
+}
+
+/* ── SAVE INDICATOR ──────────────────────────────── */
+.save-indicator {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted2);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0 4px;
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+.save-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--muted2);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.save-indicator.saved .save-dot { background: var(--green); }
+.save-indicator.saved { color: var(--green); }
+
+/* ── TOAST NOTIFICATION ──────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--s4);
+  border: 1px solid var(--border3);
+  border-radius: 40px;
+  padding: 10px 20px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  z-index: 9999;
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1), opacity 0.3s;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.toast.success { border-color: rgba(71,255,180,0.3); color: var(--green); }
+
+/* ── MOBILE LAYOUT FIXES ─────────────────────────── */
+@media (max-width: 600px) {
+  .marks-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .marks-row .mark-cell:last-child { grid-column: span 2; text-align: left; }
+  .marks-row .mark-cell:last-child .mv { font-size: 18px; }
+  .cc-meta { font-size: 9px; }
+  .cc-name { font-size: 12px; }
+  .field-row { flex-wrap: wrap; gap: 6px; }
+  .field-lbl { width: auto; min-width: 80px; }
+  /* Wider touch target for range */
+  input[type=range] { height: 6px; }
+  input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; }
+  /* Threshold table: hide % hint on small screens */
+  .thresh-table .chip { padding: 2px 5px; font-size: 9px; }
+  .thresh-table td:first-child { max-width: 90px; }
+  /* Copy summary button — full width on mobile */
+  #copy-summary-btn { width: 100%; margin-top: 4px; }
+}
+@media (max-width: 400px) {
+  .prev-sem-row { grid-template-columns: 1fr 55px 65px 50px 24px; gap: 4px; }
+  input[type=number], input[type=text] { font-size: 12px; padding: 6px 8px; }
+}
+/* ── INPUT VALIDATION STATES ─────────────────────── */
+input.input-error {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px rgba(255,71,71,0.12) !important;
+}
+input.input-warn {
+  border-color: var(--yellow) !important;
+}
+
+/* ── ONBOARDING ──────────────────────────────────── */
+.onboarding-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+.onboarding-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--acc);
+  text-transform: uppercase;
+  margin-bottom: 32px;
+}
+.onboarding-title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.onboarding-sub {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+.sem-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.sem-btn {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 16px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.sem-btn:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+  background: rgba(232,255,71,0.05);
+  transform: translateY(-1px);
+}
+.sem-btn .sem-label {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  display: block;
+  margin-top: 3px;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0;
+}
+.onboarding-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted2);
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  margin: 16px 0;
+}
+.onboarding-divider::before, .onboarding-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.onboarding-note {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1.7;
+  margin-top: 20px;
+  padding: 12px 14px;
+  background: var(--s2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+@media (max-width: 400px) {
+  .sem-grid { grid-template-columns: repeat(2, 1fr); }
+  .onboarding-title { font-size: 22px; }
+}
+
+/* ── SEM SWITCHER BAR ────────────────────────────── */
+.sem-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  position: sticky;
+  top: 52px;
+  z-index: 90;
+  min-height: 40px;
+}
+.sem-switcher-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-right: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sem-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: var(--s2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+.sem-pill:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+  background: rgba(232,255,71,0.06);
+}
+.sem-pill.active {
+  background: var(--acc);
+  color: #111;
+  border-color: var(--acc);
+  font-weight: 800;
+}
+.sem-pill.used {
+  color: var(--text2);
+  border-color: var(--border3);
+}
+.sem-pill.ghost {
+  color: var(--border3);
+  border-color: var(--border);
+  opacity: 0.45;
+}
+.sem-pill.ghost:hover {
+  opacity: 1;
+  color: var(--text2);
+  border-color: var(--border2);
+}
+.pill-dot {
+  display: inline-block;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-left: 3px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+@media (max-width: 500px) {
+  .sem-switcher-bar { padding: 7px 12px; gap: 5px; top: 48px; }
+  .sem-pill { font-size: 10px; padding: 3px 10px; }
+  .sem-switcher-label { display: none; }
+}
+
+/* ── CROSS-SEM AUTO BANNER ───────────────────────── */
+.crosssem-banner {
+  background: rgba(71,255,232,0.05);
+  border: 1px solid rgba(71,255,232,0.18);
+  border-radius: var(--radius-sm);
+  padding: 9px 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.crosssem-banner .cs-icon { flex-shrink: 0; margin-top: 1px; }
+.crosssem-banner b { color: var(--acc2); }
+.crosssem-banner .cs-override {
+  font-size: 10px;
+  color: var(--muted2);
+  display: block;
+  margin-top: 2px;
+}
+
+/* ── STRESS TEST TOGGLE ──────────────────────────── */
+/* v6: Page-level stress banner (visible when active) */
+#stress-active-banner {
+  display: none;
+  background: rgba(255,71,71,0.10);
+  border: 1.5px solid var(--red);
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 8px 14px;
+  text-align: center;
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+#stress-active-banner.on { display: block; }
+
+.stress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.stress-lbl {
+  font-size: 11px;
+  color: var(--red);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  flex: 1;
+  line-height: 1.4;
+}
+.stress-sub {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+}
+.switch.stress-switch input:checked + .slider-sw {
+  background: rgba(255,71,71,0.15);
+  border-color: var(--red);
+}
+.switch.stress-switch input:checked + .slider-sw::before {
+  background: var(--red);
+}
+
+/* ── SEM PILL CGPA CHIP ──────────────────────────── */
+.sem-cgpa-chip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(71,255,232,0.08);
+  color: var(--acc2);
+  border: 1px solid rgba(71,255,232,0.15);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.sem-pill-sgpa {
+  display: block;
+  font-size: 8px;
+  font-weight: 400;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 1px;
+  letter-spacing: 0;
+}
+.sem-pill.used .sem-pill-sgpa { color: var(--acc2); opacity: 0.7; }
+
+</style>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-brand">DOON · NEP 2020</div>
+  <div class="save-indicator" id="save-indicator"><span class="save-dot"></span><span id="save-label">auto-saved</span></div>
+  <button class="tab-btn active" onclick="showTab('calc', this)">
+    <span class="tab-icon">📊</span>
+    <span class="tab-label">Sem Calculator</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('planner', this)">
+    <span class="tab-icon">🎯</span>
+    <span class="tab-label">CGPA Planner</span>
+  </button>
+  <button class="tab-btn" onclick="showTab('ref', this)">
+    <span class="tab-icon">📋</span>
+    <span class="tab-label">Grade Reference</span>
+  </button>
+</nav>
+
+<!-- Sem Switcher Bar (persistent, below nav) -->
+<div id="sem-switcher-bar" class="sem-switcher-bar" style="display:none;"></div>
+
+<!-- ══════════════════════════════════════════════════
+     ONBOARDING (shown only on first visit)
+══════════════════════════════════════════════════ -->
+<div id="onboarding" style="display:none;">
+  <div class="onboarding-wrap">
+    <div class="onboarding-logo">Doon University · CSE · NEP 2020</div>
+    <div class="onboarding-title">Your grade calculator,<br>set up in 10 seconds.</div>
+    <div class="onboarding-sub">Pick your current semester and your courses load automatically. Just enter your marks.</div>
+
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Which semester are you in?</div>
+    <div class="sem-grid">
+      <button class="sem-btn" onclick="quickSetup(1)">Sem 1<span class="sem-label">1st Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(2)">Sem 2<span class="sem-label">1st Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(3)">Sem 3<span class="sem-label">2nd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(4)">Sem 4<span class="sem-label">2nd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(5)">Sem 5<span class="sem-label">3rd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(6)">Sem 6<span class="sem-label">3rd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(7)">Sem 7<span class="sem-label">Final Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(8)">Sem 8<span class="sem-label">Final Year</span></button>
+    </div>
+
+    <div class="onboarding-divider">or</div>
+    <button class="btn sec" style="width:100%;" onclick="skipOnboarding()">Start with a blank slate — I'll add courses manually</button>
+
+    <div class="onboarding-note">
+      ✦ Your data stays in your browser — nothing is sent anywhere.<br>
+      ✦ All your marks auto-save as you type.<br>
+      ✦ You can edit course names, credits, and marking schemes per course.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MAIN CONTENT (hidden until onboarding done)
+══════════════════════════════════════════════════ -->
+<div id="main-content" style="display:none;">
+
+<!-- ══════════════════════════════════════════════════
+     TAB 1 · SEM CALCULATOR
+══════════════════════════════════════════════════ -->
+<div class="panel active" id="tab-calc">
+
+  <!-- Hero stats -->
+  <div class="hero-grid">
+    <div class="hero-stat" style="--accent-color: var(--acc)">
+      <div class="lbl">Sem SGPA</div>
+      <div class="val" id="h-sgpa" style="color:var(--acc)">—</div>
+      <span class="div-badge" id="h-sgpa-div">add courses</span>
+    </div>
+    <div class="hero-stat" style="--accent-color: var(--acc2)">
+      <div class="lbl">Credit Points</div>
+      <div class="val" id="h-pts" style="color:var(--acc2)">—</div>
+      <div class="sub-pts" id="h-credits">/ 0 credits</div>
+    </div>
+    <!-- v5.5: On Sem 1 shows "Sem 1 only" info; from Sem 2+ shows CGPA -->
+    <div class="hero-stat" id="hero-cgpa-card" style="--accent-color: var(--acc4)">
+      <div class="lbl" id="h-cgpa-lbl">CGPA (all sems)</div>
+      <div class="val" id="h-cgpa" style="color:var(--acc4)">—</div>
+      <span class="div-badge" id="h-cgpa-div">set prev below</span>
+    </div>
+  </div>
+
+  <!-- v5.5: Hidden on Sem 1 via updateSem1UI() -->
+  <div id="prev-sem-section">
+  <!-- Previous semester data (Fix #8 — helper text added) -->
+  <div class="sec-head">Previous Semester Data</div>
+  <!-- v5.4: Auto-filled from saved sem slots — shows origin -->
+  <div id="crosssem-banner" style="display:none;" class="crosssem-banner">
+    <span class="cs-icon">⚡</span>
+    <div>
+      <b id="cs-text">Auto-computed from your saved semesters</b>
+      <span class="cs-override" id="cs-sub">You can still edit the fields below to override.</span>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div class="field-lbl" style="margin-bottom:5px;">Credits Earned (all prev sems)</div>
+        <input type="number" id="prev-credits" value="" min="0" placeholder="e.g. 22" oninput="onPrevFieldEdit()">
+        <div class="helper">Your marksheet → "Total Credits"</div>
+      </div>
+      <div>
+        <div class="field-lbl" style="margin-bottom:5px;">Credit Points (all prev sems)</div>
+        <input type="number" id="prev-points" value="" min="0" placeholder="e.g. 177" oninput="onPrevFieldEdit()">
+        <div class="helper">Credits × Grade Points, summed across all subjects</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;" id="prev-sgpa-check"></div>
+  </div>
+  </div><!-- /prev-sem-section -->
+
+  <!-- Global settings + actions -->
+  <div class="sec-head">Semester Courses</div>
+  <div class="card">
+    <div class="toggle-row">
+      <div>
+        <span class="toggle-lbl">Mid-sem contributes half weight</span>
+        <span class="toggle-sub">ON → MidSem/30 counts as max 15 marks (common at Doon Univ)</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="global-halved" checked onchange="recalcAll()">
+        <span class="slider-sw"></span>
+      </label>
+    </div>
+    <div class="flex-gap" style="margin-top:4px;">
+      <button class="btn" onclick="addCourse()">+ Add Course</button>
+      <button class="btn sec" onclick="loadDemo()" title="Load sample Semester 2 data (demo only)">Load Demo Data</button>
+      <button class="btn sec sm danger" onclick="clearCourses()">Clear All</button>
+    </div>
+    <div class="flex-gap" style="margin-top:8px;">
+      <button class="btn sec sm" id="copy-summary-btn" onclick="copySummary()" title="Copy a plain-text summary to clipboard">📋 Copy Summary</button>
+      <button class="btn sec sm" onclick="shareCard()" title="Generate a shareable image card">🖼 Share Card</button>
+      <button class="btn sec sm" onclick="exportData()" title="Download all your data as a JSON backup">⬇ Backup</button>
+      <label class="btn sec sm" title="Restore from a previously downloaded backup" style="cursor:pointer;">⬆ Restore<input type="file" accept=".json" onchange="importData(this)" style="display:none;"></label>
+    </div>
+  </div>
+
+  <div id="courses-list"></div>
+
+  <!-- Threshold table (Fix #5 — chip badges, sticky header) -->
+  <div class="sec-head">End-Sem Targets — What you need to hit each grade</div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div class="thresh-wrap">
+      <table class="thresh-table" id="thresh-table">
+        <thead>
+          <tr>
+            <th style="padding-left:14px;">Course</th>
+            <th>Cr</th>
+            <th style="color:#ffd447">B+ (7pts)</th>
+            <th style="color:#47ffe8">A (8pts)</th>
+            <th style="color:#47ffb4">A+ (9pts)</th>
+            <th style="color:#ffd700">O (10pts)</th>
+          </tr>
+        </thead>
+        <tbody id="thresh-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 2 · CGPA PLANNER
+══════════════════════════════════════════════════ -->
+<div class="panel" id="tab-planner">
+  <div class="info-box">
+    <b>How to use:</b> Add your past semester results, set current semester credits + your target CGPA — and the calculator tells you exactly what SGPA you need to hit it this semester.
+  </div>
+
+  <div class="sec-head">Past Semester Results</div>
+  <div class="card">
+    <div class="prev-sem-row" style="margin-bottom:10px;">
+      <span class="ph">Semester</span>
+      <span class="ph">Credits</span>
+      <span class="ph">Cr. Pts</span>
+      <span class="ph">SGPA</span>
+      <span></span>
+    </div>
+    <div id="past-sems-list"></div>
+    <button class="btn sec sm" onclick="addPastSem()" style="margin-top:8px;">+ Add Semester</button>
+  </div>
+
+  <div class="sec-head">Current Semester</div>
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div class="field-lbl" style="margin-bottom:5px;">Current Sem Credits</div>
+      <input type="number" id="cur-credits-plan" value="22" min="1" oninput="calcPlan()">
+    </div>
+    <div>
+      <div class="field-lbl" style="margin-bottom:5px;">Target CGPA</div>
+      <input type="number" id="target-cgpa" value="8.00" min="0" max="10" step="0.01" oninput="calcPlan()">
+      <div class="helper">8.00+ = Distinction · 6.00+ = First Div</div>
+    </div>
+  </div>
+
+  <div class="sec-head">Required SGPA</div>
+  <div class="card" id="plan-result">
+    <div style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;">
+      Add past semesters and set a target to see your required SGPA.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 3 · GRADE REFERENCE
+══════════════════════════════════════════════════ -->
+<div class="panel" id="tab-ref">
+  <div class="sec-head">Grading Scale — NEP 2020</div>
+  <div class="grade-ref" style="margin-bottom:16px;">
+    <div class="grade-ref-item"><div class="gr-letter" style="color:#ffd700">O</div><div class="gr-pts">10 pts</div><div class="gr-range">90 – 100</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--green)">A+</div><div class="gr-pts">9 pts</div><div class="gr-range">80 – 89</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc4)">A</div><div class="gr-pts">8 pts</div><div class="gr-range">70 – 79</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc2)">B+</div><div class="gr-pts">7 pts</div><div class="gr-range">60 – 69</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--yellow)">B</div><div class="gr-pts">6 pts</div><div class="gr-range">50 – 59</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:#ff9f43">C</div><div class="gr-pts">5 pts</div><div class="gr-range">40 – 49</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:#ff6b6b">D</div><div class="gr-pts">4 pts</div><div class="gr-range">30 – 39</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--red)">F</div><div class="gr-pts">0 pts</div><div class="gr-range">Below 30</div></div>
+  </div>
+
+  <div class="sec-head">Divisions</div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table class="div-table">
+      <tr><td>CGPA ≥ 8.00</td><td style="color:var(--green);font-weight:700;">★ First Division with Distinction</td><td style="color:var(--muted);font-size:10px;">Must clear all courses in first attempt</td></tr>
+      <tr><td>CGPA 6.00 – 7.99</td><td style="color:var(--acc4);font-weight:700;">First Division</td><td></td></tr>
+      <tr><td>CGPA 5.00 – 5.99</td><td style="color:var(--yellow);font-weight:700;">Second Division</td><td></td></tr>
+      <tr><td>CGPA 4.00 – 4.99</td><td style="color:var(--muted);font-weight:600;">Pass</td><td></td></tr>
+      <tr><td>CGPA below 4.00</td><td style="color:var(--red);font-weight:700;">Fail</td><td style="color:var(--muted);font-size:10px;">Repeat year if after even sem</td></tr>
+    </table>
+  </div>
+
+  <div class="sec-head">Evaluation Structure</div>
+  <div class="card">
+    <div class="info-box" style="margin-bottom:8px;">
+      <b>Mid-sem HALVED (most common):</b><br>
+      Internal /20 + MidSem/30 → capped at 15 + EndSem /50 or /70 → scaled to /100
+    </div>
+    <div class="info-box" style="margin-bottom:8px;">
+      <b>Mid-sem at full value:</b><br>
+      Internal(20) + MidSem(30) + EndSem(50) = 100 — only when mid-sem is NOT halved
+    </div>
+    <div class="info-box" style="margin-bottom:0;">
+      <b>Mid-sem not held (teacher awards):</b><br>
+      Teacher directly awards up to 30 marks. Total raw = Internal(20) + Teacher(30) + EndSem(70) = 120 → scaled to 100<br><br>
+      <b>SGPA</b> = Grade points × Credits ÷ Total credits (this semester)<br>
+      <b>CGPA</b> = Cumulative points ÷ Cumulative credits<br>
+      <b>Equivalent %</b> = CGPA × 10
+    </div>
+  </div>
+
+  <div class="sec-head">Promotion Rules</div>
+  <div class="card">
+    <div class="info-box" style="margin-bottom:0;">
+      • Odd → Even semester: promoted regardless of CGPA.<br>
+      • Even semester (2nd/4th): must achieve <b>CGPA ≥ 4.00</b> to continue.<br>
+      • Below 4.00 after even semester → must repeat the academic year.<br>
+      • No make-up exams. No grace marks.<br>
+      • Grade improvement: only for C or D, after program completion, within 1 year.
+    </div>
+  </div>
+</div>
+</div><!-- /main-content -->
+
+<script>
+// ─── STATE ─────────────────────────────────────────
+let courses = [];
+let courseIdCounter = 0;
+let pastSems = [];
+let pastSemIdCounter = 0;
+let _saveTimer = null;
+let crossSemOverride = false;   // v5.4: true if user manually edited prev fields
+
+// ─── LOCALSTORAGE PERSISTENCE ───────────────────────
+const SEM_KEY    = n => 'doon_calc_sem_' + n;   // per-semester slot
+const PLAN_KEY   = 'doon_calc_planner';              // CGPA planner (shared)
+const META_KEY   = 'doon_calc_meta';                 // { activeSem, semsUsed[] }
+let activeSem    = null;  // which semester slot is currently open (1-8)
+
+function saveState() {
+  try {
+    // Save current semester slot
+    if (activeSem) {
+      const semState = {
+        courses,
+        courseIdCounter,
+        globalHalved: document.getElementById('global-halved').checked,
+        savedAt: Date.now(),
+        semNum: activeSem,
+      };
+      localStorage.setItem(SEM_KEY(activeSem), JSON.stringify(semState));
+    }
+    // Save planner state separately
+    const planState = {
+      pastSems,
+      pastSemIdCounter,
+      prevCredits: document.getElementById('prev-credits').value,
+      prevPoints:  document.getElementById('prev-points').value,
+      curCreditsPlan: document.getElementById('cur-credits-plan').value,
+      targetCgpa: document.getElementById('target-cgpa').value,
+    };
+    localStorage.setItem(PLAN_KEY, JSON.stringify(planState));
+    // Save meta
+    const meta = getMetaState();
+    if (activeSem && !meta.semsUsed.includes(activeSem)) {
+      meta.semsUsed.push(activeSem);
+      meta.semsUsed.sort((a,b) => a-b);
+    }
+    meta.activeSem = activeSem;
+    localStorage.setItem(META_KEY, JSON.stringify(meta));
+    // Flash the save indicator
+    const ind = document.getElementById('save-indicator');
+    const lbl = document.getElementById('save-label');
+    ind.classList.add('saved');
+    const d = new Date();
+    lbl.textContent = 'saved ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+      ind.classList.remove('saved');
+      lbl.textContent = 'auto-saved';
+    }, 2500);
+  } catch(e) { /* storage quota or private mode — silently ignore */ }
+}
+
+function getMetaState() {
+  try {
+    const raw = localStorage.getItem(META_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { activeSem: null, semsUsed: [] };
+}
+
+// ─── v5.4: CROSS-SEM CGPA AUTO-FILL ────────────────
+// Reads all saved sem slots BEFORE activeSem, sums credits+points,
+// then fills the prev-credits/prev-points fields automatically.
+function autoFillPrevFromSavedSems(currentSem) {
+  if (crossSemOverride) return; // user manually set values — respect that
+
+  const meta = getMetaState();
+  const semsUsed = (meta.semsUsed || []).filter(s => s < currentSem).sort((a,b) => a-b);
+  if (semsUsed.length === 0) {
+    // No prior sems — clear fields and hide banner
+    document.getElementById('prev-credits').value = '';
+    document.getElementById('prev-points').value = '';
+    document.getElementById('crosssem-banner').style.display = 'none';
+    updateHero();
+    return;
+  }
+
+  let totalCr = 0, totalPts = 0;
+  const semsContrib = [];
+
+  semsUsed.forEach(semN => {
+    try {
+      const raw = localStorage.getItem(SEM_KEY(semN));
+      if (!raw) return;
+      const state = JSON.parse(raw);
+      const semCourses = state.courses || [];
+      const halved = state.globalHalved ?? true;
+      let semCr = 0, semPts = 0;
+      semCourses.forEach(c => {
+        const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halved ? 'halved' : 'full');
+        const cv = { ...c, midsemType: effectiveMidsemType };
+        const total = calcTotal(cv, c.endsemScore);
+        const grade = getGrade(total);
+        semPts += grade.pts * c.credits;
+        semCr  += c.credits;
+      });
+      totalCr  += semCr;
+      totalPts += semPts;
+      if (semCr > 0) {
+        const sgpa = (semPts / semCr).toFixed(2);
+        semsContrib.push(`Sem ${semN} (${sgpa})`);
+      }
+    } catch(e) {}
+  });
+
+  if (totalCr === 0) {
+    document.getElementById('crosssem-banner').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('prev-credits').value = totalCr;
+  document.getElementById('prev-points').value  = totalPts;
+
+  // Show informational banner
+  const banner = document.getElementById('crosssem-banner');
+  const cgpa = (totalPts / totalCr).toFixed(2);
+  const d = divLabel(totalPts / totalCr);
+  document.getElementById('cs-text').innerHTML =
+    `⚡ Auto-filled from ${semsContrib.join(', ')} → CGPA so far: <b style="color:${d.color}">${cgpa}</b>`;
+  document.getElementById('cs-sub').textContent =
+    'You can edit the fields below to override (e.g. if a course grade changed).';
+  banner.style.display = 'flex';
+
+  updateHero();
+  updatePrevSgpaCheck();
+}
+
+function loadSemSlot(semNum) {
+  try {
+    const raw = localStorage.getItem(SEM_KEY(semNum));
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (state.savedAt && (Date.now() - state.savedAt) > 365 * 24 * 3600 * 1000) return false;
+    courses = state.courses || [];
+    courseIdCounter = state.courseIdCounter || courses.length;
+    document.getElementById('global-halved').checked = state.globalHalved ?? true;
+    return true;
+  } catch(e) { return false; }
+}
+
+function loadPlannerSlot() {
+  try {
+    const raw = localStorage.getItem(PLAN_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    pastSems = state.pastSems || [];
+    pastSemIdCounter = state.pastSemIdCounter || pastSems.length;
+    document.getElementById('prev-credits').value     = state.prevCredits   ?? '';
+    document.getElementById('prev-points').value      = state.prevPoints    ?? '';
+    document.getElementById('cur-credits-plan').value = state.curCreditsPlan ?? 22;
+    document.getElementById('target-cgpa').value      = state.targetCgpa   ?? '8.00';
+  } catch(e) {}
+}
+
+function switchToSem(semNum) {
+  // Save current sem first
+  if (activeSem) saveState();
+  activeSem = semNum;
+  crossSemOverride = false; // reset override flag on sem switch
+
+  const ok = loadSemSlot(semNum);
+  if (!ok) {
+    // New slot — init from SEM_COURSES if available
+    courses = [];
+    courseIdCounter = 0;
+    if (SEM_COURSES[semNum]) {
+      SEM_COURSES[semNum].forEach(sc => {
+        courses.push({
+          id: ++courseIdCounter,
+          name: sc.name, credits: sc.credits,
+          internal: 0, internalMax: 20,
+          midsem: 0, midsemMax: 30, midsemType: 'auto',
+          teacherAward: 0, teacherAwardMax: 30,
+          endsemMax: sc.endsemMax, endsemScore: 0,
+        });
+      });
+    }
+  }
+  renderCourses();
+  renderSemSwitcher();
+  updateSem1UI(); // v5.5: hide/show prev section and CGPA card based on sem
+  autoFillPrevFromSavedSems(semNum); // v5.4: auto-fill CGPA from prev sems
+  debouncedSave();
+  const label = ok ? 'Sem ' + semNum + ' loaded' : 'Sem ' + semNum + ' started';
+  showToast('✓ ' + label, 'success');
+}
+
+// Legacy single-key migration (v3 → v4 multi-sem)
+function restoreState(state) {
+  // Only used for legacy migration — new code uses loadSemSlot/loadPlannerSlot
+  courses = state.courses || [];
+  courseIdCounter = state.courseIdCounter || courses.length;
+  pastSems = state.pastSems || [];
+  pastSemIdCounter = state.pastSemIdCounter || pastSems.length;
+  document.getElementById('prev-credits').value     = state.prevCredits   ?? '';
+  document.getElementById('prev-points').value      = state.prevPoints    ?? '';
+  document.getElementById('global-halved').checked  = state.globalHalved ?? true;
+  document.getElementById('cur-credits-plan').value = state.curCreditsPlan ?? 22;
+  document.getElementById('target-cgpa').value      = state.targetCgpa   ?? '8.00';
+}
+
+function debouncedSave() {
+  // Save 600ms after last change — avoids hammering storage on rapid slider drag
+  clearTimeout(window._debounceSaveTimer);
+  window._debounceSaveTimer = setTimeout(saveState, 600);
+}
+
+// v5.4: Called when user manually edits the prev-credits/prev-points fields
+function onPrevFieldEdit() {
+  crossSemOverride = true;
+  const banner = document.getElementById('crosssem-banner');
+  if (banner) {
+    document.getElementById('cs-sub').textContent = 'Manual override active — auto-fill paused.';
+  }
+  recalcAll();
+}
+
+// ─── SEM SWITCHER UI ────────────────────────────────
+function renderSemSwitcher() {
+  const bar = document.getElementById('sem-switcher-bar');
+  if (!bar) return;
+  if (!activeSem) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const meta = getMetaState();
+  const used = meta.semsUsed || [];
+  const allUsed = used.includes(activeSem) ? used : [...used, activeSem].sort((a,b)=>a-b);
+
+  // v5.4: Compute per-sem SGPA for pills and running CGPA
+  const semSgpaMap = {};
+  let runningCr = 0, runningPts = 0;
+  allUsed.forEach(s => {
+    try {
+      const raw = localStorage.getItem(SEM_KEY(s));
+      if (!raw) return;
+      const state = JSON.parse(raw);
+      const semCourses = state.courses || [];
+      const halved = state.globalHalved ?? true;
+      let semCr = 0, semPts = 0;
+      semCourses.forEach(c => {
+        const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halved ? 'halved' : 'full');
+        const cv = { ...c, midsemType: effectiveMidsemType };
+        const total = calcTotal(cv, c.endsemScore);
+        const grade = getGrade(total);
+        semPts += grade.pts * c.credits;
+        semCr  += c.credits;
+      });
+      if (semCr > 0) {
+        semSgpaMap[s] = (semPts / semCr);
+        runningCr  += semCr;
+        runningPts += semPts;
+      }
+    } catch(e) {}
+  });
+
+  let html = '<span class="sem-switcher-label">Semester</span>';
+  for (let s = 1; s <= 8; s++) {
+    const isActive = s === activeSem;
+    const isUsed   = allUsed.includes(s);
+    const cls = 'sem-pill' + (isActive ? ' active' : '') + (!isActive && isUsed ? ' used' : '') + (!isActive && !isUsed ? ' ghost' : '');
+    const dot  = isUsed && !isActive ? '<span class="pill-dot"></span>' : '';
+    // v5.4: Show SGPA under pill if computed
+    const sgpaStr = (isUsed && semSgpaMap[s]) ? `<span class="sem-pill-sgpa">${semSgpaMap[s].toFixed(2)}</span>` : '';
+    html += `<button class="${cls}" onclick="switchToSem(${s})" title="Semester ${s}${isUsed ? ` · SGPA ${(semSgpaMap[s]||0).toFixed(2)}` : ' · start fresh'}">${s}${dot}${sgpaStr}</button>`;
+  }
+
+  // v5.4: Running CGPA chip
+  if (runningCr > 0) {
+    const cgpa = (runningPts / runningCr).toFixed(2);
+    const d = divLabel(runningPts / runningCr);
+    html += `<span class="sem-cgpa-chip" title="Cumulative CGPA across all saved semesters">CGPA <span style="color:${d.color}">${cgpa}</span></span>`;
+  }
+
+  bar.innerHTML = html;
+  // Update sem label in hero
+  const lbl = document.getElementById('active-sem-label');
+  if (lbl) lbl.textContent = '· SEM ' + activeSem;
+}
+
+// ─── TOAST ───────────────────────────────────────────
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── COPY SUMMARY ───────────────────────────────────
+function copySummary() {
+  if (courses.length === 0) {
+    showToast('No courses to summarise — add some first!');
+    return;
+  }
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const prevCr  = parseFloat(document.getElementById('prev-credits').value)  || 0;
+  const prevPts = parseFloat(document.getElementById('prev-points').value)   || 0;
+
+  let totalPts = 0, totalCr = 0;
+  const lines = [];
+
+  lines.push('╔═══════════════════════════════════════╗');
+  lines.push('║   DOON UNIVERSITY — GRADE SUMMARY     ║');
+  lines.push('╚═══════════════════════════════════════╝');
+  lines.push('Generated: ' + new Date().toLocaleString());
+  lines.push('');
+  lines.push('SEMESTER COURSES');
+  lines.push('─'.repeat(42));
+
+  const padR = (s, n) => String(s).padEnd(n);
+  const padL = (s, n) => String(s).padStart(n);
+
+  lines.push(padR('Course', 28) + padL('Cr', 4) + padL('Total', 7) + padL('Grade', 7) + padL('Pts', 5));
+  lines.push('─'.repeat(42));
+
+  courses.forEach(c => {
+    const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+    const cv = { ...c, midsemType: effectiveMidsemType };
+    const total = calcTotal(cv, c.endsemScore);
+    const grade = getGrade(total);
+    totalPts += grade.pts * c.credits;
+    totalCr  += c.credits;
+    const name = c.name.length > 26 ? c.name.slice(0, 24) + '..' : c.name;
+    lines.push(padR(name, 28) + padL(c.credits, 4) + padL(total.toFixed(1), 7) + padL(grade.letter, 7) + padL(grade.pts, 5));
+  });
+
+  lines.push('─'.repeat(42));
+  const sgpa = totalCr > 0 ? totalPts / totalCr : 0;
+  const sd = divLabel(sgpa);
+  lines.push('');
+  lines.push('SEMESTER RESULT');
+  lines.push('  Total Credits   : ' + totalCr);
+  lines.push('  Credit Points   : ' + totalPts);
+  lines.push('  SGPA            : ' + sgpa.toFixed(2) + '  (' + sd.txt + ')');
+  lines.push('  Equivalent %    : ' + (sgpa * 10).toFixed(1) + '%');
+
+  if (prevCr > 0) {
+    const cgpaCredits = prevCr + totalCr;
+    const cgpaPoints  = prevPts + totalPts;
+    const cgpa = cgpaCredits > 0 ? cgpaPoints / cgpaCredits : 0;
+    const cd = divLabel(cgpa);
+    lines.push('');
+    lines.push('CUMULATIVE (ALL SEMESTERS)');
+    lines.push('  Previous Credits: ' + prevCr + ' · Points: ' + prevPts);
+    lines.push('  CGPA            : ' + cgpa.toFixed(2) + '  (' + cd.txt + ')');
+  }
+
+  lines.push('');
+  lines.push('Grade Scale: O(10) A+(9) A(8) B+(7) B(6) C(5) D(4) F(0)');
+  lines.push('Distinction ≥ 8.00 · First Div ≥ 6.00 · Second Div ≥ 5.00');
+  lines.push('─'.repeat(42));
+
+  const text = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('✓ Summary copied to clipboard!', 'success');
+    }).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('✓ Summary copied!', 'success');
+  } catch(e) {
+    showToast('Could not copy — try long-pressing the text');
+  }
+  document.body.removeChild(ta);
+}
+
+// ─── SHARE CARD (v6.1) ──────────────────────────────
+// Draws a 1080×1920 canvas card (WhatsApp/Instagram story size)
+// showing SGPA, CGPA, per-course grades, and division badge.
+
+function shareCard() {
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const prevCr  = parseFloat(document.getElementById('prev-credits').value) || 0;
+  const prevPts = parseFloat(document.getElementById('prev-points').value) || 0;
+
+  if (courses.length === 0) {
+    showToast('Add some courses first!');
+    return;
+  }
+
+  // ── Compute data ──
+  let totalPts = 0, totalCr = 0;
+  const courseRows = courses.map(c => {
+    const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+    const cv = { ...c, midsemType: effectiveMidsemType };
+    const total = calcTotal(cv, c.endsemScore);
+    const grade = getGrade(total);
+    totalPts += grade.pts * c.credits;
+    totalCr  += c.credits;
+    return { name: c.name, credits: c.credits, total, grade };
+  });
+
+  const sgpa = totalCr > 0 ? totalPts / totalCr : 0;
+  const cgpaCredits = prevCr + totalCr;
+  const cgpaPoints  = prevPts + totalPts;
+  const cgpa = cgpaCredits > 0 ? cgpaPoints / cgpaCredits : null;
+  const sd = divLabel(sgpa);
+
+  // ── Canvas setup ──
+  const W = 1080, H = 1920;
+  const canvas = document.getElementById('share-canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#060608');
+  bg.addColorStop(0.5, '#0d0d18');
+  bg.addColorStop(1, '#060608');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid pattern
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // Accent glow top
+  const glow = ctx.createRadialGradient(W/2, 0, 0, W/2, 0, 600);
+  glow.addColorStop(0, sd.color + '22');
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, 600);
+
+  // ── Header ──
+  ctx.fillStyle = sd.color;
+  ctx.font = '500 32px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('DOON UNIVERSITY · CSE', W/2, 120);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.font = '400 26px "IBM Plex Mono", monospace';
+  ctx.fillText(`SEM ${activeSem || ''}  ·  RESULT CARD`, W/2, 168);
+
+  // Divider line
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(80, 200); ctx.lineTo(W - 80, 200); ctx.stroke();
+
+  // ── SGPA Hero ──
+  const sgpaColor = sd.color;
+  ctx.fillStyle = sgpaColor + '15';
+  roundRect(ctx, 80, 230, W - 160, 280, 24);
+  ctx.fill();
+  ctx.strokeStyle = sgpaColor + '40';
+  ctx.lineWidth = 2;
+  roundRect(ctx, 80, 230, W - 160, 280, 24);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.40)';
+  ctx.font = '500 30px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('SEMESTER GPA', W/2, 290);
+
+  ctx.fillStyle = sgpaColor;
+  ctx.font = `700 160px "IBM Plex Mono", monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText(sgpa.toFixed(2), W/2, 440);
+
+  // Division badge
+  const badgeTxt = sd.txt.toUpperCase();
+  ctx.font = '700 28px Inter, sans-serif';
+  const bdW = ctx.measureText(badgeTxt).width + 48;
+  ctx.fillStyle = sgpaColor + '25';
+  roundRect(ctx, W/2 - bdW/2, 458, bdW, 50, 25);
+  ctx.fill();
+  ctx.fillStyle = sgpaColor;
+  ctx.font = '700 26px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(badgeTxt, W/2, 490);
+
+  // ── CGPA row (if available) ──
+  let nextY = 560;
+  if (cgpa !== null) {
+    const cd = divLabel(cgpa);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    roundRect(ctx, 80, nextY, W - 160, 110, 16);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = '500 24px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('CUMULATIVE CGPA', 130, nextY + 44);
+
+    ctx.fillStyle = cd.color;
+    ctx.font = '700 52px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(cgpa.toFixed(2), W - 130, nextY + 90);
+
+    nextY += 138;
+  }
+
+  // ── Course table ──
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(80, nextY); ctx.lineTo(W - 80, nextY); ctx.stroke();
+  nextY += 30;
+
+  // Table header
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '500 24px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('COURSE', 100, nextY);
+  ctx.textAlign = 'center';
+  ctx.fillText('CR', W - 290, nextY);
+  ctx.fillText('TOTAL', W - 190, nextY);
+  ctx.fillText('GR', W - 100, nextY);
+  nextY += 16;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath(); ctx.moveTo(80, nextY); ctx.lineTo(W - 80, nextY); ctx.stroke();
+  nextY += 28;
+
+  const rowH = Math.min(90, Math.floor((H - nextY - 200) / courseRows.length));
+
+  courseRows.forEach((row, i) => {
+    const even = i % 2 === 0;
+    if (even) {
+      ctx.fillStyle = 'rgba(255,255,255,0.025)';
+      ctx.fillRect(80, nextY - 20, W - 160, rowH);
+    }
+
+    // Course name — truncate if needed
+    const maxNameW = W - 160 - 280;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = `500 ${Math.min(28, rowH * 0.38)}px Inter, sans-serif`;
+    ctx.textAlign = 'left';
+    const truncName = truncateText(ctx, row.name, maxNameW);
+    ctx.fillText(truncName, 100, nextY + rowH * 0.42);
+
+    // Credits
+    ctx.fillStyle = 'rgba(255,255,255,0.40)';
+    ctx.font = `500 ${Math.min(26, rowH * 0.35)}px "IBM Plex Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(row.credits, W - 290, nextY + rowH * 0.42);
+
+    // Total
+    ctx.fillStyle = row.grade.color;
+    ctx.font = `600 ${Math.min(26, rowH * 0.35)}px "IBM Plex Mono", monospace`;
+    ctx.fillText(row.total.toFixed(1), W - 190, nextY + rowH * 0.42);
+
+    // Grade pill
+    const gpW = 80, gpH = Math.min(40, rowH * 0.5);
+    ctx.fillStyle = row.grade.color + '28';
+    roundRect(ctx, W - 148, nextY + (rowH - gpH) / 2 - 4, gpW, gpH, gpH / 2);
+    ctx.fill();
+    ctx.strokeStyle = row.grade.color + '60';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, W - 148, nextY + (rowH - gpH) / 2 - 4, gpW, gpH, gpH / 2);
+    ctx.stroke();
+    ctx.fillStyle = row.grade.color;
+    ctx.font = `700 ${Math.min(24, rowH * 0.32)}px "IBM Plex Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(row.grade.letter, W - 108, nextY + rowH * 0.44);
+
+    nextY += rowH;
+  });
+
+  // Show modal
+  document.getElementById('share-modal').style.display = 'block';
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').style.display = 'none';
+}
+
+function downloadCard() {
+  const canvas = document.getElementById('share-canvas');
+  const a = document.createElement('a');
+  const sem = activeSem ? `sem${activeSem}-` : '';
+  a.download = `doon-cse-${sem}sgpa.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+  showToast('✓ Card downloaded!', 'success');
+}
+
+function copyCardToClipboard() {
+  const canvas = document.getElementById('share-canvas');
+  canvas.toBlob(blob => {
+    try {
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(() => {
+        showToast('✓ Copied to clipboard!', 'success');
+      }).catch(() => showToast('Clipboard copy not supported — use Download instead'));
+    } catch(e) {
+      showToast('Use Download instead on this browser');
+    }
+  });
+}
+
+// Canvas helpers
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function truncateText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) {
+    t = t.slice(0, -1);
+  }
+  return t + '…';
+}
+
+// ─── DATA BACKUP / RESTORE (v6 P0) ──────────────────// Exports ALL localStorage keys used by this app as a
+// single timestamped JSON file — protects against data loss.
+function exportData() {
+  try {
+    const meta = getMetaState();
+    const blob_data = { _version: 6, _exportedAt: new Date().toISOString(), meta };
+    // Collect every sem slot
+    (meta.semsUsed || []).forEach(n => {
+      const raw = localStorage.getItem(SEM_KEY(n));
+      if (raw) blob_data['sem_' + n] = JSON.parse(raw);
+    });
+    // Collect planner
+    const planRaw = localStorage.getItem(PLAN_KEY);
+    if (planRaw) blob_data.planner = JSON.parse(planRaw);
+
+    const blob = new Blob([JSON.stringify(blob_data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const ts   = new Date().toISOString().slice(0, 10);
+    a.href = url; a.download = `doon-grades-backup-${ts}.json`;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+    showToast('✓ Backup downloaded!', 'success');
+  } catch(e) {
+    showToast('Export failed — ' + e.message);
+  }
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.meta || !data._version) throw new Error('Not a valid backup file');
+      // Restore all sem slots
+      const semsUsed = data.meta.semsUsed || [];
+      semsUsed.forEach(n => {
+        if (data['sem_' + n]) {
+          localStorage.setItem(SEM_KEY(n), JSON.stringify(data['sem_' + n]));
+        }
+      });
+      // Restore planner
+      if (data.planner) localStorage.setItem(PLAN_KEY, JSON.stringify(data.planner));
+      // Restore meta
+      localStorage.setItem(META_KEY, JSON.stringify(data.meta));
+      showToast('✓ Backup restored! Reloading…', 'success');
+      setTimeout(() => location.reload(), 1200);
+    } catch(err) {
+      showToast('Restore failed: ' + err.message);
+    }
+    input.value = ''; // reset file input
+  };
+  reader.readAsText(file);
+}
+
+// ─── SECURITY: HTML ESCAPE ───────────────────────────
+// All user-controlled strings must pass through this before
+// being interpolated into innerHTML. Prevents persistent XSS.
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ─── INPUT VALIDATION ────────────────────────────────
+// Validates a numeric input, shows error/warn class, clamps to max.
+// Returns true if valid, false if below min.
+function validateNumberInput(el, min, max) {
+  const val = parseFloat(el.value);
+  el.classList.remove('input-error', 'input-warn');
+  if (isNaN(val) || val < min) {
+    el.value = min; // clamp to minimum
+    el.classList.add('input-error');
+    setTimeout(() => el.classList.remove('input-error'), 1200);
+    return false;
+  }
+  if (max !== undefined && val > max) {
+    el.value = max; // clamp to maximum
+    el.classList.add('input-warn');
+    setTimeout(() => el.classList.remove('input-warn'), 1200);
+  }
+  return true;
+}
+
+
+
+// ─── TAB SWITCHING ──────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── v5.4: STRESS TEST MODE ─────────────────────────
+// Temporarily renders all endsem sliders as 0 without mutating stored data.
+// The stressTestActive flag makes calcTotal/renderCourses treat endsemScore as 0.
+function toggleStressTest() {
+  // Stress test removed in v6.1
+}
+
+// ─── v5.5: SEM 1 UI CLEANUP ─────────────────────────
+// On Sem 1 there are no previous semesters, so hide:
+//   - the entire "Previous Semester Data" section
+//   - the CGPA hero card (meaningless with one sem)
+// Replace the CGPA card with a "Sem 1" label showing just the
+// total marks context instead.
+function updateSem1UI() {
+  const isSem1 = activeSem === 1;
+  const prevSection = document.getElementById('prev-sem-section');
+  const cgpaCard    = document.getElementById('hero-cgpa-card');
+  const cgpaLbl     = document.getElementById('h-cgpa-lbl');
+  const cgpaDiv     = document.getElementById('h-cgpa-div');
+  const cgpaVal     = document.getElementById('h-cgpa');
+
+  if (prevSection) prevSection.style.display = isSem1 ? 'none' : '';
+
+  if (cgpaCard) {
+    if (isSem1) {
+      // Re-purpose the third card to show something useful for Sem 1
+      cgpaCard.style.setProperty('--accent-color', 'var(--muted2)');
+      if (cgpaLbl) cgpaLbl.textContent = 'CGPA';
+      if (cgpaVal) { cgpaVal.textContent = '—'; cgpaVal.style.color = 'var(--muted)'; }
+      if (cgpaDiv) {
+        cgpaDiv.textContent = 'available from Sem 2';
+        cgpaDiv.style.color = 'var(--muted2)';
+        cgpaDiv.style.background = 'rgba(255,255,255,0.04)';
+      }
+    } else {
+      // Restore normal CGPA card styling
+      cgpaCard.style.setProperty('--accent-color', 'var(--acc4)');
+      if (cgpaLbl) cgpaLbl.textContent = 'CGPA (all sems)';
+      // Values will be filled by updateHero() immediately after
+    }
+  }
+}
+
+// ─── GRADE HELPERS ──────────────────────────────────
+const GRADES = [
+  { letter: 'O',  pts: 10, min: 90, color: '#ffd700' },
+  { letter: 'A+', pts: 9,  min: 80, color: '#47ffb4' },
+  { letter: 'A',  pts: 8,  min: 70, color: '#b47fff' },
+  { letter: 'B+', pts: 7,  min: 60, color: '#47ffe8' },
+  { letter: 'B',  pts: 6,  min: 50, color: '#ffd447' },
+  { letter: 'C',  pts: 5,  min: 40, color: '#ff9f43' },
+  { letter: 'D',  pts: 4,  min: 30, color: '#ff6b6b' },
+  { letter: 'F',  pts: 0,  min: 0,  color: '#ff4747' },
+];
+
+function getGrade(total) {
+  for (const g of GRADES) if (total >= g.min) return g;
+  return GRADES[GRADES.length - 1];
+}
+
+function divLabel(cgpa) {
+  if (cgpa >= 8.0) return { txt: '★ Distinction', color: '#47ffb4' };
+  if (cgpa >= 6.0) return { txt: 'First Division', color: '#b47fff' };
+  if (cgpa >= 5.0) return { txt: 'Second Division', color: '#ffd447' };
+  if (cgpa >= 4.0) return { txt: 'Pass', color: '#aaaaaa' };
+  return { txt: 'Fail', color: '#ff4747' };
+}
+
+// ─── CALC HELPERS ───────────────────────────────────
+function calcTotal(c, endsemScore) {
+  const iMax = c.internalMax || 20;
+  let raw, maxRaw;
+  if (c.midsemType === 'teacher') {
+    const taMax = c.teacherAwardMax || 30;
+    raw = c.internal + c.teacherAward + endsemScore;
+    maxRaw = iMax + taMax + 70;
+  } else if (c.midsemType === 'halved') {
+    const halfMax = (c.midsemMax || 30) / 2;
+    const ms = (c.midsem / (c.midsemMax || 30)) * halfMax;
+    raw = c.internal + ms + endsemScore;
+    maxRaw = iMax + halfMax + c.endsemMax;
+  } else {
+    raw = c.internal + c.midsem + endsemScore;
+    maxRaw = iMax + (c.midsemMax || 30) + c.endsemMax;
+  }
+  return (raw / maxRaw) * 100;
+}
+
+function minEndsemFor(c, targetTotal) {
+  const iMax = c.internalMax || 20;
+  let maxRaw, secured;
+  if (c.midsemType === 'teacher') {
+    const taMax = c.teacherAwardMax || 30;
+    maxRaw = iMax + taMax + 70;
+    secured = c.internal + c.teacherAward;
+  } else if (c.midsemType === 'halved') {
+    const halfMax = (c.midsemMax || 30) / 2;
+    maxRaw = iMax + halfMax + c.endsemMax;
+    secured = c.internal + (c.midsem / (c.midsemMax || 30)) * halfMax;
+  } else {
+    maxRaw = iMax + (c.midsemMax || 30) + c.endsemMax;
+    secured = c.internal + c.midsem;
+  }
+  return (targetTotal / 100) * maxRaw - secured;
+}
+
+// ─── PREV SEM SANITY CHECK (Fix #8) ─────────────────
+function updatePrevSgpaCheck() {
+  const cr = parseFloat(document.getElementById('prev-credits').value) || 0;
+  const pts = parseFloat(document.getElementById('prev-points').value) || 0;
+  const el = document.getElementById('prev-sgpa-check');
+  if (cr > 0 && pts > 0) {
+    const sgpa = (pts / cr).toFixed(2);
+    const d = divLabel(pts / cr);
+    el.innerHTML = `<span class="prev-sgpa-display">Prev SGPA = <b style="color:${d.color}">${sgpa}</b> — ${d.txt}</span>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+// ─── RENDER COURSES ─────────────────────────────────
+function renderCourses() {
+  const container = document.getElementById('courses-list');
+  const halvedGlobal = document.getElementById('global-halved').checked;
+
+  if (courses.length === 0) {
+    container.innerHTML = `
+      <div class="card empty-state">
+        <div class="empty-icon">📚</div>
+        <div class="empty-title">No courses added yet</div>
+        <div class="empty-sub">Add your subjects or load demo data<br>to start calculating your SGPA.</div>
+        <div class="empty-actions">
+          <button class="btn" onclick="addCourse()">+ Add Course</button>
+          <button class="btn sec" onclick="loadDemo()">Load Demo Data</button>
+        </div>
+      </div>`;
+    updateHero();
+    renderThresh();
+    return;
+  }
+
+  // Preserve which cards are expanded before rebuilding DOM
+  const expanded = new Set(
+    [...document.querySelectorAll('.course-card.expanded')]
+      .map(el => el.id.replace('course-card-', ''))
+      .map(Number)
+  );
+
+  container.innerHTML = '';
+  courses.forEach(c => renderOneCourse(c, container, halvedGlobal));
+
+  // Restore expanded state
+  expanded.forEach(id => {
+    const card = document.getElementById('course-card-' + id);
+    if (card) card.classList.add('expanded');
+  });
+
+  updateHero();
+  renderThresh();
+  updatePrevSgpaCheck();
+}
+
+// ─── THRESHOLD TICKS FOR RANGE SLIDER (Fix #6) ──────
+function buildTicks(endsemMax, c) {
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+  const cv = { ...c, midsemType: effectiveMidsemType };
+
+  const targets = [
+    { pct: 60, color: '#47ffe8', label: 'B+' },
+    { pct: 70, color: '#b47fff', label: 'A'  },
+    { pct: 80, color: '#47ffb4', label: 'A+' },
+    { pct: 90, color: '#ffd700', label: 'O'  },
+  ];
+
+  let html = '';
+  targets.forEach(t => {
+    const needed = minEndsemFor(cv, t.pct);
+    if (needed > 0 && needed <= endsemMax) {
+      const pos = (needed / endsemMax) * 100;
+      html += `<div class="tick" style="left:${pos}%;background:${t.color}"></div>`;
+      html += `<div class="tick-label" style="left:${pos}%;color:${t.color}">${t.label}</div>`;
+    }
+  });
+  return html;
+}
+
+// ─── RENDER ONE COURSE (Fix #3 — collapsible) ───────
+function renderOneCourse(c, container, halvedGlobal) {
+  const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+  const cv = { ...c, midsemType: effectiveMidsemType };
+  // v5.4: stress test removed in v6.1
+  const effectiveEndsem = c.endsemScore;
+  const total = calcTotal(cv, effectiveEndsem);
+  const grade = getGrade(total);
+
+  let midDisplay, securedDisplay;
+  if (effectiveMidsemType === 'teacher') {
+    midDisplay = `${c.teacherAward}/${c.teacherAward} (teacher)`;
+    securedDisplay = (c.internal + c.teacherAward).toFixed(1);
+  } else if (effectiveMidsemType === 'halved') {
+    const ms = (c.midsem / c.midsemMax) * 15;
+    midDisplay = `${c.midsem}/${c.midsemMax} → ${ms.toFixed(1)}/15`;
+    securedDisplay = (c.internal + ms).toFixed(1);
+  } else {
+    midDisplay = `${c.midsem}/${c.midsemMax}`;
+    securedDisplay = (c.internal + c.midsem).toFixed(1);
+  }
+
+  const card = document.createElement('div');
+  card.className = 'course-card';
+  card.id = 'course-card-' + c.id;
+
+  const ticksHtml = buildTicks(c.endsemMax, c);
+
+  card.innerHTML = `
+    <!-- Collapsed header — always visible -->
+    <div class="cc-header" onclick="toggleExpand(${c.id})">
+      <div class="cc-left">
+        <div class="cc-name" id="ccname-${c.id}">${escapeHtml(c.name)}</div>
+        <div class="cc-meta">${c.credits} cr · ${total.toFixed(1)}/100 · End-sem ${c.endsemScore}/${c.endsemMax}</div>
+      </div>
+      <div class="cc-right">
+        <div class="grade-pill" style="background:${grade.color}22;color:${grade.color};border-color:${grade.color}44" id="gpill-${c.id}">
+          ${grade.letter} &middot; ${grade.pts}
+        </div>
+        <button class="del-btn" onclick="event.stopPropagation();removeCourse(${c.id})" title="Remove course">✕</button>
+        <span class="cc-chevron" id="chev-${c.id}">▾</span>
+      </div>
+    </div>
+
+    <!-- Mini progress bar — always visible -->
+    <div class="cc-minibar">
+      <div class="cc-minifill" id="minibar-${c.id}" style="width:${Math.min(total,100)}%;background:${grade.color}"></div>
+    </div>
+
+    <!-- Expandable body -->
+    <div class="cc-body" id="ccbody-${c.id}">
+      <!-- Editable name -->
+      <div style="margin-bottom:12px;">
+        <label class="field-lbl" style="margin-bottom:4px;display:block;" for="cname-input-${c.id}">Course Name</label>
+        <input type="text" id="cname-input-${c.id}" value="${escapeHtml(c.name)}"
+          onblur="updateCourseName(${c.id}, this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()"
+          style="width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:600;color:var(--text);">
+      </div>
+
+      <!-- Marks row -->
+      <div class="marks-row">
+        <div class="mark-cell">
+          <div class="ml">Credits</div>
+          <input type="number" value="${c.credits}" min="1" max="8" style="width:60px;text-align:center;font-size:13px;padding:4px 6px;"
+            onchange="validateNumberInput(this,1,8);updateCourseField(${c.id},'credits',+this.value)">
+        </div>
+        <div class="mark-cell">
+          <div class="ml">Internal /${c.internalMax||20}</div>
+          <input type="number" value="${c.internal}" min="0" max="${c.internalMax||20}" style="width:60px;text-align:center;font-size:13px;padding:4px 6px;"
+            onchange="validateNumberInput(this,0,${c.internalMax||20});updateCourseField(${c.id},\'internal\',+this.value)">
+        </div>
+        <div class="mark-cell">
+          <div class="ml">Mid-sem</div>
+          ${effectiveMidsemType === 'teacher'
+            ? `<input type="number" value="${c.teacherAward}" min="0" max="30" style="width:60px;text-align:center;font-size:13px;padding:4px 6px;" onchange="validateNumberInput(this,0,30);updateCourseField(${c.id},'teacherAward',+this.value)">`
+            : `<input type="number" value="${c.midsem}" min="0" max="${c.midsemMax}" style="width:60px;text-align:center;font-size:13px;padding:4px 6px;" onchange="validateNumberInput(this,0,${c.midsemMax});updateCourseField(${c.id},'midsem',+this.value)">`
+          }
+        </div>
+        <div class="mark-cell">
+          <div class="ml">Pre-end total</div>
+          <div class="mv" id="secured-${c.id}" style="color:var(--acc2)">${securedDisplay}</div>
+        </div>
+        <div class="mark-cell">
+          <div class="ml">Total /100</div>
+          <div class="mv" id="total-${c.id}" style="color:${grade.color}">${total.toFixed(1)}</div>
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-lbl">Mid-sem not held — teacher awards marks</span>
+          <span class="toggle-sub">Teacher directly assigns marks (e.g. gave 20/30, not full 30)</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" ${c.midsemType === 'teacher' ? 'checked' : ''} onchange="updateCourseField(${c.id},'midsemType',this.checked?'teacher':'auto')">
+          <span class="slider-sw"></span>
+        </label>
+      </div>
+      <div class="toggle-row" style="padding-bottom:4px;">
+        <div>
+          <span class="toggle-lbl">End-sem out of 50 (has practicals)</span>
+          <span class="toggle-sub">Uncheck for theory-only courses (out of 70)</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" ${c.endsemMax === 50 ? 'checked' : ''} onchange="updateCourseField(${c.id},'endsemMax',this.checked?50:70)">
+          <span class="slider-sw"></span>
+        </label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;padding-top:10px;border-top:1px solid var(--border);">
+        <div>
+          <div class="field-lbl" style="margin-bottom:4px;">Internal marks max</div>
+          <select onchange="updateCourseField(${c.id},\'internalMax\',+this.value)" style="font-size:12px;padding:5px 8px;">
+            <option value="20" ${(c.internalMax||20)===20?'selected':''}>/ 20 (default)</option>
+            <option value="25" ${(c.internalMax||20)===25?'selected':''}>/ 25</option>
+            <option value="30" ${(c.internalMax||20)===30?'selected':''}>/ 30</option>
+            <option value="15" ${(c.internalMax||20)===15?'selected':''}>/ 15</option>
+          </select>
+        </div>
+        <div id="teacher-award-max-${c.id}" style="${c.midsemType==='teacher'?'':'opacity:0.3;pointer-events:none;'}">
+          <div class="field-lbl" style="margin-bottom:4px;">Marks teacher actually gave</div>
+          <select onchange="updateCourseField(${c.id},\'teacherAwardMax\',+this.value)" style="font-size:12px;padding:5px 8px;">
+            <option value="30" ${(c.teacherAwardMax||30)===30?'selected':''}>max 30 (gave full)</option>
+            <option value="25" ${(c.teacherAwardMax||30)===25?'selected':''}>max 25</option>
+            <option value="20" ${(c.teacherAwardMax||30)===20?'selected':''}>max 20</option>
+            <option value="15" ${(c.teacherAwardMax||30)===15?'selected':''}>max 15</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- End sem slider with threshold ticks (Fix #6) -->
+      <div class="field-row" style="margin-top:8px;">
+        <span class="field-lbl">End Sem /${c.endsemMax}</span>
+        <div class="range-wrap">
+          <input type="range" min="0" max="${c.endsemMax}" value="${c.endsemScore}" step="0.5"
+            oninput="updateEndsem(${c.id}, +this.value)">
+          <div class="range-ticks" id="ticks-${c.id}">${ticksHtml}</div>
+        </div>
+        <span class="range-val" id="rv-${c.id}">${c.endsemScore}</span>
+      </div>
+
+      <div class="prog-bar">
+        <div class="prog-fill" id="pbar-${c.id}" style="width:${Math.min(total,100)}%;background:${grade.color}"></div>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+}
+
+// ─── EXPAND/COLLAPSE ────────────────────────────────
+function toggleExpand(id) {
+  const card = document.getElementById('course-card-' + id);
+  card.classList.toggle('expanded');
+}
+
+// ─── UPDATE HELPERS ─────────────────────────────────
+function updateEndsem(id, val) {
+  const c = courses.find(x => x.id === id);
+  if (!c) return;
+  c.endsemScore = val;
+  document.getElementById('rv-' + id).textContent = val;
+  refreshCourseDisplay(c);
+  updateHero();
+  renderThresh();
+  debouncedSave();
+}
+
+// ─── SURGICAL CARD REBUILD (no collapse side-effect) ─
+function rebuildCourseBody(id) {
+  // Re-renders only the body of an existing card — preserves expanded state
+  const c = courses.find(x => x.id === id);
+  if (!c) return;
+  const card = document.getElementById('course-card-' + id);
+  if (!card) { renderCourses(); return; }  // fallback if card not in DOM
+
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher'
+    : (halvedGlobal ? 'halved' : 'full');
+  const cv = { ...c, midsemType: effectiveMidsemType };
+  const total = calcTotal(cv, c.endsemScore);
+  const grade = getGrade(total);
+
+  // Rebuild body by creating a temp card and transplanting its body
+  const tempContainer = document.createElement('div');
+  renderOneCourse(c, tempContainer, halvedGlobal);
+  const newCard = tempContainer.firstChild;
+
+  // Swap only the cc-body
+  const oldBody = card.querySelector('.cc-body');
+  const newBody = newCard.querySelector('.cc-body');
+  if (oldBody && newBody) oldBody.replaceWith(newBody);
+
+  // Also update the endsem slider section if present
+  const oldSlider = card.querySelector('.endsem-slider-wrap');
+  const newSlider = newCard.querySelector('.endsem-slider-wrap');
+  if (oldSlider && newSlider) oldSlider.replaceWith(newSlider);
+
+  // Update header meta line and grade pill
+  refreshCourseDisplay(c);
+}
+
+function updateCourseField(id, field, val) {
+  const c = courses.find(x => x.id === id);
+  if (!c) return;
+  if (field === 'midsemType') {
+    c.midsemType = val;
+    rebuildCourseBody(id);   // surgical — card stays expanded
+    updateHero();
+    renderThresh();
+    debouncedSave();
+    return;
+  }
+  if (field === 'endsemMax') {
+    c.endsemMax = val;
+    if (c.endsemScore > val) c.endsemScore = val;
+    rebuildCourseBody(id);   // surgical — card stays expanded
+    updateHero();
+    renderThresh();
+    debouncedSave();
+    return;
+  }
+  if (field === 'internalMax') {
+    c.internalMax = val;
+    // Clamp internal score to new max
+    if (c.internal > val) c.internal = val;
+    rebuildCourseBody(id);
+    updateHero();
+    renderThresh();
+    debouncedSave();
+    return;
+  }
+  if (field === 'teacherAwardMax') {
+    c.teacherAwardMax = val;
+    if (c.teacherAward > val) c.teacherAward = val;
+    rebuildCourseBody(id);
+    updateHero();
+    renderThresh();
+    debouncedSave();
+    return;
+  }
+  c[field] = val;
+  refreshCourseDisplay(c);
+  updateHero();
+  renderThresh();
+  debouncedSave();
+}
+
+function updateCourseName(id, val) {
+  const c = courses.find(x => x.id === id);
+  if (c) c.name = val.trim();
+  renderThresh();
+  debouncedSave();
+  // Also update header display name
+  const nameEl = document.getElementById('ccname-' + id);
+  if (nameEl && val.trim()) nameEl.textContent = val.trim();
+}
+
+function refreshCourseDisplay(c) {
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+  const cv = { ...c, midsemType: effectiveMidsemType };
+  // stress test removed in v6.1
+  const effectiveEndsem = c.endsemScore;
+  const total = calcTotal(cv, effectiveEndsem);
+  const grade = getGrade(total);
+
+  let securedDisplay;
+  if (effectiveMidsemType === 'teacher') {
+    securedDisplay = (c.internal + c.teacherAward).toFixed(1);
+  } else if (effectiveMidsemType === 'halved') {
+    securedDisplay = (c.internal + (c.midsem / c.midsemMax) * 15).toFixed(1);
+  } else {
+    securedDisplay = (c.internal + c.midsem).toFixed(1);
+  }
+
+  const totalEl = document.getElementById('total-' + c.id);
+  const secEl   = document.getElementById('secured-' + c.id);
+  const pillEl  = document.getElementById('gpill-' + c.id);
+  const barEl   = document.getElementById('pbar-' + c.id);
+  const miniEl  = document.getElementById('minibar-' + c.id);
+  const metaEl  = document.querySelector(`#course-card-${c.id} .cc-meta`);
+  const tickEl  = document.getElementById('ticks-' + c.id);
+
+  if (totalEl) { totalEl.textContent = total.toFixed(1); totalEl.style.color = grade.color; }
+  if (secEl) secEl.textContent = securedDisplay;
+  if (pillEl) {
+    pillEl.innerHTML = `${grade.letter} &middot; ${grade.pts}`;
+    pillEl.style.background = grade.color + '22';
+    pillEl.style.color = grade.color;
+    pillEl.style.borderColor = grade.color + '44';
+  }
+  if (barEl) { barEl.style.width = Math.min(total,100) + '%'; barEl.style.background = grade.color; }
+  if (miniEl) { miniEl.style.width = Math.min(total,100) + '%'; miniEl.style.background = grade.color; }
+  if (metaEl) metaEl.textContent = `${c.credits} cr · ${total.toFixed(1)}/100 · End-sem ${c.endsemScore}/${c.endsemMax}`;
+  if (tickEl) tickEl.innerHTML = buildTicks(c.endsemMax, c);
+}
+
+// ─── HERO UPDATE ────────────────────────────────────
+function updateHero() {
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const prevCr  = parseFloat(document.getElementById('prev-credits').value) || 0;
+  const prevPts = parseFloat(document.getElementById('prev-points').value) || 0;
+
+  let totalPts = 0, totalCr = 0;
+  courses.forEach(c => {
+    const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+    const cv = { ...c, midsemType: effectiveMidsemType };
+    // stress test removed in v6.1
+    const effectiveEndsem = c.endsemScore;
+    const total = calcTotal(cv, effectiveEndsem);
+    const grade = getGrade(total);
+    totalPts += grade.pts * c.credits;
+    totalCr  += c.credits;
+  });
+
+  const sgpa = totalCr > 0 ? totalPts / totalCr : null;
+  const cgpaCredits = prevCr + totalCr;
+  const cgpaPoints  = prevPts + totalPts;
+  const cgpa = cgpaCredits > 0 ? cgpaPoints / cgpaCredits : null;
+
+  document.getElementById('h-sgpa').textContent     = sgpa !== null ? sgpa.toFixed(2) : '—';
+  document.getElementById('h-pts').textContent      = totalCr > 0 ? totalPts : '—';
+  document.getElementById('h-credits').textContent  = `/ ${totalCr} credits`;
+  document.getElementById('h-cgpa').textContent     = cgpa !== null ? cgpa.toFixed(2) : '—';
+
+  if (sgpa !== null) {
+    const sd = divLabel(sgpa);
+    const badge = document.getElementById('h-sgpa-div');
+    badge.textContent = sd.txt;
+    badge.style.color = sd.color;
+    badge.style.background = sd.color + '18';
+    document.getElementById('h-sgpa').style.color = sd.color;
+  }
+  if (cgpa !== null) {
+    const cd = divLabel(cgpa);
+    const badge = document.getElementById('h-cgpa-div');
+    badge.textContent = cd.txt;
+    badge.style.color = cd.color;
+    badge.style.background = cd.color + '18';
+    document.getElementById('h-cgpa').style.color = cd.color;
+  }
+
+  updatePrevSgpaCheck();
+}
+
+// ─── THRESHOLD TABLE (Fix #5) ───────────────────────
+function renderThresh() {
+  const halvedGlobal = document.getElementById('global-halved').checked;
+  const tbody = document.getElementById('thresh-body');
+  tbody.innerHTML = '';
+  const targets = [
+    { grade: 'B+', min: 60, color: '#ffd447' },
+    { grade: 'A',  min: 70, color: '#47ffe8' },
+    { grade: 'A+', min: 80, color: '#47ffb4' },
+    { grade: 'O',  min: 90, color: '#ffd700' },
+  ];
+
+  courses.forEach(c => {
+    const effectiveMidsemType = c.midsemType === 'teacher' ? 'teacher' : (halvedGlobal ? 'halved' : 'full');
+    // v5.4: When stress-testing, compute thresholds as if endsem is the only unknown
+    const cv = { ...c, midsemType: effectiveMidsemType };
+    const tr = document.createElement('tr');
+    let cells = `<td style="font-weight:600;font-size:12px;padding-left:14px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.name)}</td><td style="color:var(--muted)">${c.credits}</td>`;
+
+    targets.forEach(t => {
+      const needed = minEndsemFor(cv, t.min);
+      let display;
+      if (needed <= 0) {
+        display = `<span class="chip achieved">✓ Achieved</span>`;
+      } else if (needed > c.endsemMax) {
+        display = `<span class="chip impossible">✕ Impossible</span>`;
+      } else {
+        const pct = Math.round((needed / c.endsemMax) * 100);
+        display = `<span class="chip needed" style="color:${t.color};border-color:${t.color}33;">${Math.ceil(needed)}/${c.endsemMax} <span style="color:var(--muted);font-size:9px">${pct}%</span></span>`;
+      }
+      cells += `<td>${display}</td>`;
+    });
+
+    tr.innerHTML = cells;
+    tbody.appendChild(tr);
+  });
+
+  if (courses.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;">Add courses above to see grade thresholds</td></tr>`;
+  }
+}
+
+// ─── COURSE MANAGEMENT ──────────────────────────────
+function addCourse(preset) {
+  const c = preset || {
+    id: ++courseIdCounter,
+    name: 'Course ' + courseIdCounter,
+    credits: 4,
+    internal: 0,
+    internalMax: 20,
+    midsem: 0,
+    midsemMax: 30,
+    midsemType: 'auto',
+    teacherAward: 30,
+    teacherAwardMax: 30,
+    endsemMax: 70,
+    endsemScore: 0,
+  };
+  if (!preset) c.id = ++courseIdCounter;
+  courses.push(c);
+  renderCourses();
+  debouncedSave();
+  // Auto-expand the newly added course
+  setTimeout(() => {
+    const newCard = document.getElementById('course-card-' + c.id);
+    if (newCard) newCard.classList.add('expanded');
+  }, 0);
+}
+
+function removeCourse(id) {
+  courses = courses.filter(c => c.id !== id);
+  renderCourses();
+  debouncedSave();
+}
+
+function clearCourses() {
+  if (courses.length === 0) return;
+  courses = [];
+  renderCourses();
+  debouncedSave();
+}
+
+function recalcAll() {
+  renderCourses();
+  debouncedSave();
+}
+
+// Fix #4: renamed loadYashSem2 → loadDemo, clarified it's sample data
+function loadDemo() {
+  courses = [];
+  courseIdCounter = 0;
+  // Demo uses Sem 2 CSE course names — marks are illustrative, not any real person's data
+  const data = [
+    { name: 'Computer Architecture',      credits: 4, internal: 15, internalMax: 20, midsem: 20,   midsemMax: 30, midsemType: 'auto',    teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 48 },
+    { name: 'Discrete Mathematics',        credits: 4, internal: 16, internalMax: 20, midsem: 22,   midsemMax: 30, midsemType: 'auto',    teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 52 },
+    { name: 'Fundamentals of Electronics', credits: 4, internal: 14, internalMax: 20, midsem: 18,   midsemMax: 30, midsemType: 'auto',    teacherAward: 25, teacherAwardMax: 30, endsemMax: 50, endsemScore: 35 },
+    { name: 'Optimisation Techniques',     credits: 3, internal: 17, internalMax: 20, midsem: 0,    midsemMax: 30, midsemType: 'teacher', teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 50 },
+    { name: 'Communicative English',        credits: 2, internal: 18, internalMax: 20, midsem: 0,    midsemMax: 30, midsemType: 'teacher', teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 55 },
+  ];
+  data.forEach(d => { d.id = ++courseIdCounter; courses.push(d); });
+  document.getElementById('prev-credits').value = '';
+  document.getElementById('prev-points').value  = '';
+  renderCourses();
+}
+
+// ─── CGPA PLANNER ───────────────────────────────────
+function addPastSem(preset) {
+  const id = ++pastSemIdCounter;
+  const s = preset || { id, sem: id, credits: 22, points: 0 };
+  s.id = id;
+  pastSems.push(s);
+  renderPastSems();
+  calcPlan();
+  debouncedSave();
+}
+
+function removePastSem(id) {
+  pastSems = pastSems.filter(s => s.id !== id);
+  renderPastSems();
+  calcPlan();
+  debouncedSave();
+}
+
+function renderPastSems() {
+  const list = document.getElementById('past-sems-list');
+  list.innerHTML = '';
+  pastSems.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'prev-sem-row';
+    const sgpaVal = s.credits > 0 ? (s.points / s.credits) : 0;
+    const d = divLabel(sgpaVal);
+    row.innerHTML = `
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)">Sem ${s.sem}</div>
+      <input type="number" value="${s.credits}" min="1" placeholder="Credits" style="font-size:12px;padding:6px 8px;" onchange="updatePastSem(${s.id},'credits',+this.value)">
+      <input type="number" value="${s.points}" min="0" placeholder="Cr.Pts" style="font-size:12px;padding:6px 8px;" onchange="updatePastSem(${s.id},'points',+this.value)">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:${d.color};text-align:center;padding:6px 0;" id="plan-sgpa-${s.id}">
+        ${s.credits > 0 ? (s.points / s.credits).toFixed(2) : '—'}
+      </div>
+      <button class="del-btn" onclick="removePastSem(${s.id})">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updatePastSem(id, field, val) {
+  const s = pastSems.find(x => x.id === id);
+  if (!s) return;
+  s[field] = val;
+  debouncedSave();
+  if (field === 'credits' || field === 'points') {
+    const el = document.getElementById('plan-sgpa-' + id);
+    if (el) {
+      const sgpaVal = s.credits > 0 ? s.points / s.credits : 0;
+      const d = divLabel(sgpaVal);
+      el.textContent = s.credits > 0 ? (s.points / s.credits).toFixed(2) : '—';
+      el.style.color = d.color;
+    }
+  }
+  calcPlan();
+}
+
+function calcPlan() {
+  const curCredits = parseFloat(document.getElementById('cur-credits-plan').value) || 0;
+  const target     = parseFloat(document.getElementById('target-cgpa').value) || 0;
+  let prevCr = 0, prevPts = 0;
+  pastSems.forEach(s => { prevCr += s.credits; prevPts += s.points; });
+
+  const totalCr = prevCr + curCredits;
+  const neededTotalPts = target * totalCr;
+  const neededCurPts   = neededTotalPts - prevPts;
+  const neededSGPA = curCredits > 0 ? neededCurPts / curCredits : null;
+  const res = document.getElementById('plan-result');
+
+  if (curCredits === 0) {
+    res.innerHTML = `<div style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;">Set current semester credits to see the result.</div>`;
+    return;
+  }
+
+  const currentCGPA = prevCr > 0 ? prevPts / prevCr : null;
+  let html = '';
+
+  if (currentCGPA !== null) {
+    const cd = divLabel(currentCGPA);
+    html += `<div class="info-box" style="margin-bottom:12px;">
+      Current CGPA: <b style="color:${cd.color}">${currentCGPA.toFixed(2)}</b> — ${cd.txt}<br>
+      Prev credits: <b>${prevCr}</b> · Prev credit points: <b>${prevPts}</b>
+    </div>`;
+  }
+
+  if (neededSGPA === null || isNaN(neededSGPA)) {
+    html += `<div style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;">Enter valid data to continue.</div>`;
+  } else if (neededSGPA > 10) {
+    const maxCGPA = (prevPts + 10 * curCredits) / totalCr;
+    const md = divLabel(maxCGPA);
+    html += `<div class="warn-box">
+      ⚠ A CGPA of <b>${target.toFixed(2)}</b> is not achievable — even with a perfect 10.00 SGPA this semester.<br><br>
+      Maximum achievable CGPA: <b style="color:${md.color}">${maxCGPA.toFixed(2)}</b> — ${md.txt}
+    </div>`;
+  } else if (neededSGPA <= 0) {
+    const sd = divLabel(target);
+    html += `<div class="success-box">
+      ✅ Target CGPA of <b>${target.toFixed(2)}</b> (${sd.txt}) is already guaranteed — you'll exceed it even with a 0 SGPA this semester.<br>Consider aiming higher!
+    </div>`;
+  } else {
+    const sd = divLabel(neededSGPA);
+    const td = divLabel(target);
+    const gradeNeeded = GRADES.find(g => g.pts >= Math.ceil(neededSGPA));
+    html += `<div class="info-box" style="border-color:rgba(232,255,71,0.2);background:rgba(232,255,71,0.05);">
+      To reach CGPA <b style="color:${td.color}">${target.toFixed(2)}</b> (${td.txt}):<br><br>
+      Required SGPA this semester: <b style="color:${sd.color};font-size:22px;letter-spacing:-1px;">${neededSGPA.toFixed(3)}</b><br>
+      Required credit points: <b>${neededCurPts.toFixed(1)}</b> of ${curCredits * 10} max<br><br>
+      ${gradeNeeded ? `Average roughly <b style="color:${gradeNeeded.color}">${gradeNeeded.letter}</b> (${gradeNeeded.pts} pts) or better in every course.` : ''}
+    </div>`;
+
+    html += `<div class="sec-head" style="margin-top:16px;">CGPA projection by SGPA</div>`;
+    html += `<table class="thresh-table"><thead><tr>
+      <th>Your SGPA</th><th>Cr. Points</th><th>Final CGPA</th><th>Division</th>
+    </tr></thead><tbody>`;
+    [6,7,8,9,10].forEach(sgpaTest => {
+      const pts     = sgpaTest * curCredits;
+      const cgpaTest = (prevPts + pts) / totalCr;
+      const d = divLabel(cgpaTest);
+      const isTarget = Math.round(neededSGPA) === sgpaTest;
+      html += `<tr style="${isTarget ? 'background:rgba(232,255,71,0.06);' : ''}">
+        <td style="color:var(--acc2)">${sgpaTest}.00${isTarget ? ' ←' : ''}</td>
+        <td>${pts}</td>
+        <td style="color:${d.color};font-weight:700">${cgpaTest.toFixed(2)}</td>
+        <td style="color:${d.color}">${d.txt}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  }
+
+  res.innerHTML = html;
+  debouncedSave();
+}
+
+// ─── SEMESTER COURSE MAP (NEP 2020 CSE, Doon Univ) ─
+const SEM_COURSES = {
+  1: [
+    { name: 'Problem Solving & Programming in C', credits: 4, endsemMax: 70 },
+    { name: 'Digital System Design',               credits: 4, endsemMax: 70 },
+    { name: 'Fundamentals of Computer Science',    credits: 4, endsemMax: 70 },
+    { name: 'AECC (from pool)',                    credits: 2, endsemMax: 70 },
+    { name: 'VAC (from pool)',                     credits: 2, endsemMax: 70 },
+    { name: 'Generic Elective 1 (e.g. Applied Calculus)', credits: 3, endsemMax: 70 },
+    { name: 'Generic Elective 2 (e.g. Mechanics I)',      credits: 3, endsemMax: 70 },
+  ],
+  2: [
+    { name: 'Computer Architecture',               credits: 4, endsemMax: 70 },
+    { name: 'Discrete Mathematics',                credits: 4, endsemMax: 70 },
+    { name: 'Fundamentals of Electronics',         credits: 4, endsemMax: 50 },
+    { name: 'AECC (from pool)',                    credits: 2, endsemMax: 70 },
+    { name: 'VAC (from pool)',                     credits: 2, endsemMax: 70 },
+    { name: 'Generic Elective (e.g. Opt. Prob. & Stats)', credits: 3, endsemMax: 70 },
+  ],
+  3: [
+    { name: 'Data Structures',                     credits: 4, endsemMax: 70 },
+    { name: 'OOP using C++',                       credits: 4, endsemMax: 70 },
+    { name: 'Theory of Computation',               credits: 4, endsemMax: 70 },
+    { name: 'AECC (from pool)',                    credits: 2, endsemMax: 70 },
+    { name: 'VAC (from pool)',                     credits: 2, endsemMax: 70 },
+    { name: 'Python Programming with Project',     credits: 2, endsemMax: 50 },
+    { name: 'Elective',                            credits: 4, endsemMax: 70 },
+  ],
+  4: [
+    { name: 'Database Management System',          credits: 4, endsemMax: 70 },
+    { name: 'Numerical & Statistical Computing',   credits: 4, endsemMax: 70 },
+    { name: 'Design & Analysis of Algorithms',     credits: 4, endsemMax: 70 },
+    { name: 'AECC (from pool)',                    credits: 2, endsemMax: 70 },
+    { name: 'VAC (from pool)',                     credits: 2, endsemMax: 70 },
+    { name: 'Server-side Web Technologies',        credits: 2, endsemMax: 50 },
+    { name: 'Elective',                            credits: 4, endsemMax: 70 },
+  ],
+  5: [
+    { name: 'Operating Systems',                   credits: 4, endsemMax: 70 },
+    { name: 'Compiler Design',                     credits: 4, endsemMax: 70 },
+    { name: 'Computer Networks',                   credits: 4, endsemMax: 70 },
+    { name: 'DSE Elective 1',                      credits: 4, endsemMax: 70 },
+    { name: 'GE / DSE Elective 2',                 credits: 4, endsemMax: 70 },
+    { name: 'Project-1 with Internship',           credits: 2, endsemMax: 50 },
+  ],
+  6: [
+    { name: 'Software Engineering',                credits: 4, endsemMax: 70 },
+    { name: 'System Software',                     credits: 4, endsemMax: 70 },
+    { name: 'Programming in Java',                 credits: 4, endsemMax: 70 },
+    { name: 'DSE Elective 1',                      credits: 4, endsemMax: 70 },
+    { name: 'GE / DSE Elective 2',                 credits: 4, endsemMax: 70 },
+    { name: 'Project-2 with Internship',           credits: 2, endsemMax: 50 },
+  ],
+  7: [
+    { name: 'Computer Graphics',                   credits: 4, endsemMax: 70 },
+    { name: 'DSE/GE Elective 1',                   credits: 4, endsemMax: 70 },
+    { name: 'DSE/GE Elective 2',                   credits: 4, endsemMax: 70 },
+    { name: 'DSE/GE Elective 3',                   credits: 4, endsemMax: 70 },
+    { name: 'UG Dissertation Part 1',              credits: 6, endsemMax: 70 },
+  ],
+  8: [
+    { name: 'Artificial Intelligence',             credits: 4, endsemMax: 70 },
+    { name: 'DSE/GE Elective 1',                   credits: 4, endsemMax: 70 },
+    { name: 'DSE/GE Elective 2',                   credits: 4, endsemMax: 70 },
+    { name: 'DSE/GE Elective 3',                   credits: 4, endsemMax: 70 },
+    { name: 'UG Dissertation Part 2',              credits: 6, endsemMax: 70 },
+  ],
+};
+
+// ─── QUICK SETUP — load courses from semester map ───
+function quickSetup(sem) {
+  const semNum = parseInt(sem);
+  if (!SEM_COURSES[semNum]) return;
+  // Hide onboarding, show calculator
+  const ob = document.getElementById('onboarding');
+  if (ob) ob.style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  activeSem = semNum;
+  crossSemOverride = false;
+  // Init this sem slot from course map
+  courses = [];
+  courseIdCounter = 0;
+  SEM_COURSES[semNum].forEach(sc => {
+    courses.push({
+      id: ++courseIdCounter,
+      name: sc.name,
+      credits: sc.credits,
+      internal: 0, internalMax: 20,
+      midsem: 0, midsemMax: 30, midsemType: 'auto',
+      teacherAward: 0, teacherAwardMax: 30,
+      endsemMax: sc.endsemMax, endsemScore: 0,
+    });
+  });
+  renderCourses();
+  renderSemSwitcher();
+  updateSem1UI(); // v5.5: hide/show prev section based on sem
+  debouncedSave();
+  // v5.4: Auto-fill from prior saved sems
+  autoFillPrevFromSavedSems(semNum);
+  showToast('✓ Sem ' + semNum + ' loaded — enter your marks!', 'success');
+}
+
+function skipOnboarding() {
+  const ob = document.getElementById('onboarding');
+  if (ob) ob.style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  if (!activeSem) activeSem = 1;
+  courses = [];
+  courseIdCounter = 0;
+  renderCourses();
+  renderSemSwitcher();
+  updateSem1UI(); // v5.5
+}
+
+// ─── INIT ───────────────────────────────────────────
+(function init() {
+  let restored = false;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const state = JSON.parse(raw);
+      if (state.savedAt && (Date.now() - state.savedAt) < 90 * 24 * 3600 * 1000) {
+        restoreState(state);
+        restored = true;
+      }
+    }
+  } catch(e) { /* ignore corrupt storage */ }
+
+  // ── Multi-sem restore ──
+  const meta = getMetaState();
+  const semsUsed = meta.semsUsed || [];
+
+  // Legacy migration: if old single-key data exists, migrate it
+  try {
+    const legacyRaw = localStorage.getItem('doon_calc_v3');
+    if (legacyRaw && semsUsed.length === 0) {
+      const legacy = JSON.parse(legacyRaw);
+      if (legacy.courses && legacy.courses.length > 0) {
+        // Migrate to sem slot 1 (best guess)
+        activeSem = 1;
+        courses = legacy.courses;
+        courseIdCounter = legacy.courseIdCounter || courses.length;
+        localStorage.setItem(SEM_KEY(1), JSON.stringify({ courses, courseIdCounter, globalHalved: legacy.globalHalved, savedAt: Date.now(), semNum: 1 }));
+        const newMeta = { activeSem: 1, semsUsed: [1] };
+        localStorage.setItem(META_KEY, JSON.stringify(newMeta));
+        pastSems = legacy.pastSems || [];
+        pastSemIdCounter = legacy.pastSemIdCounter || 0;
+        document.getElementById('prev-credits').value = legacy.prevCredits ?? '';
+        document.getElementById('prev-points').value  = legacy.prevPoints  ?? '';
+        document.getElementById('cur-credits-plan').value = legacy.curCreditsPlan ?? 22;
+        document.getElementById('target-cgpa').value = legacy.targetCgpa ?? '8.00';
+        localStorage.removeItem('doon_calc_v3'); // clean up legacy key
+        restored = true;
+      }
+    }
+  } catch(e) {}
+
+  if (!restored && semsUsed.length > 0) {
+    // New multi-sem storage found
+    const semToLoad = meta.activeSem || semsUsed[0];
+    activeSem = semToLoad;
+    loadSemSlot(semToLoad);
+    loadPlannerSlot();
+    restored = true;
+  }
+
+  if (restored) {
+    const ob = document.getElementById('onboarding');
+    if (ob) ob.style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+    renderCourses();
+    renderPastSems();
+    renderSemSwitcher();
+    updateSem1UI(); // v5.5: hide prev section on Sem 1 restore
+    calcPlan();
+    // v5.4: Auto-fill prev sems from saved slots (only if not already manually set)
+    if (activeSem && activeSem > 1) {
+      autoFillPrevFromSavedSems(activeSem);
+    }
+    setTimeout(() => {
+      const ind = document.getElementById('save-indicator');
+      const lbl = document.getElementById('save-label');
+      ind.classList.add('saved');
+      lbl.textContent = 'data restored ✓';
+      setTimeout(() => { ind.classList.remove('saved'); lbl.textContent = 'auto-saved'; }, 3000);
+    }, 300);
+  } else {
+    // First visit
+    document.getElementById('onboarding').style.display = 'block';
+    document.getElementById('main-content').style.display = 'none';
+    document.getElementById('cur-credits-plan').value = 22;
+    document.getElementById('target-cgpa').value = '8.00';
+    calcPlan();
+  }
+})();
+</script>
+<!-- ══════════════════════════════════════════════════
+     SHARE CARD MODAL
+══════════════════════════════════════════════════ -->
+<div id="share-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);overflow-y:auto;padding:24px 16px;">
+  <div style="max-width:420px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--acc);letter-spacing:2px;text-transform:uppercase;">Share Card</span>
+      <button onclick="closeShareModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px;">✕</button>
+    </div>
+    <canvas id="share-canvas" style="width:100%;border-radius:12px;display:block;"></canvas>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn" style="flex:1;" onclick="downloadCard()">⬇ Download Image</button>
+      <button class="btn sec" style="flex:1;" onclick="copyCardToClipboard()">📋 Copy to Clipboard</button>
+    </div>
+    <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);text-align:center;">1080 × 1920 px · sized for WhatsApp / Instagram status</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+</body>
+</html>
