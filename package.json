@@ -1,0 +1,30 @@
+{
+  "name": "grade-calculator",
+  "version": "1.0.0",
+  "description": "A what-if simulator for end-semester exam planning — built for CSE students at Doon University.",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve .",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yash-bebop/grade-calculator.git"
+  },
+  "keywords": [
+    "grade-calculator",
+    "doon-university",
+    "cgpa",
+    "sgpa"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Yash-bebop/grade-calculator/issues"
+  },
+  "homepage": "https://github.com/Yash-bebop/grade-calculator#readme",
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
+  }
+}
