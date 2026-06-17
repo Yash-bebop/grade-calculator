@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doon University · Grade Calculator v6.0</title>
 <link rel="stylesheet" href="styles.css">
+<!-- Vercel Web Analytics — keep this when replacing index.html; it's not auto-injected for plain static sites -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
@@ -16,19 +21,39 @@
     <span class="theme-icon icon-sun">☀️</span>
     <span class="theme-icon icon-moon">🌙</span>
   </button>
-  <button class="tab-btn active" onclick="showTab('calc', this)">
+  <button class="tab-btn active" data-tab="calc" onclick="showTab('calc', this)">
     <span class="tab-icon">📊</span>
     <span class="tab-label">Sem Calculator</span>
   </button>
-  <button class="tab-btn" onclick="showTab('planner', this)">
+  <button class="tab-btn" data-tab="planner" onclick="showTab('planner', this)">
     <span class="tab-icon">🎯</span>
     <span class="tab-label">CGPA Planner</span>
   </button>
-  <button class="tab-btn" onclick="showTab('ref', this)">
+  <button class="tab-btn" data-tab="ref" onclick="showTab('ref', this)">
     <span class="tab-icon">📋</span>
     <span class="tab-label">Grade Reference</span>
   </button>
+
+  <!-- Mobile-only: hamburger replaces the 3 tabs below 768px so there's
+       nothing to discover by sliding — tap it, a panel of all 3 pages appears. -->
+  <div class="nav-menu-wrap">
+    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu(event)" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
 </nav>
+<div class="mobile-menu-overlay" id="mobile-menu-overlay" onclick="closeMobileMenu()"></div>
+<div class="mobile-menu-panel" id="mobile-menu-panel" role="menu">
+  <button class="menu-item active" data-tab="calc" onclick="showTab('calc', this)" role="menuitem">
+    <span class="tab-icon">📊</span><span>Sem Calculator</span>
+  </button>
+  <button class="menu-item" data-tab="planner" onclick="showTab('planner', this)" role="menuitem">
+    <span class="tab-icon">🎯</span><span>CGPA Planner</span>
+  </button>
+  <button class="menu-item" data-tab="ref" onclick="showTab('ref', this)" role="menuitem">
+    <span class="tab-icon">📋</span><span>Grade Reference</span>
+  </button>
+</div>
 
 <!-- Sem Switcher Bar (persistent, below nav) -->
 <div id="sem-switcher-bar" class="sem-switcher-bar" style="display:none;"></div>
@@ -273,6 +298,10 @@
   </div>
 </div>
 </div><!-- /main-content -->
+
+<footer class="site-footer">
+  Made by <strong>Yashvardhan Dobhal</strong> · CSE'29 · Doon University
+</footer>
 
 <script src="script.js"></script>
 <!-- ══════════════════════════════════════════════════
