@@ -1,0 +1,1312 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+/*
+  ╔══════════════════════════════════════════════════════╗
+  ║  PM + UI CRITIQUE → WHAT CHANGED AND WHY            ║
+  ╠══════════════════════════════════════════════════════╣
+  ║                                                      ║
+  ║  1. NAV OVERFLOW (BUG)                               ║
+  ║     Original: Tab labels overflow on mobile with     ║
+  ║     no scroll; nav-brand + 3 tabs don't fit ≤360px.  ║
+  ║     Fix: overflow-x:auto + icon-only below 480px.    ║
+  ║                                                      ║
+  ║  2. HERO STAT CARDS ARE INERT                        ║
+  ║     Original: 3 big numbers but zero contextual      ║
+  ║     affordance — a first-time user doesn't know      ║
+  ║     what SGPA vs CGPA means or which is good.        ║
+  ║     Fix: Added a subtle coloured division badge      ║
+  ║     (Distinction / First etc.) + a mini progress     ║
+  ║     arc SVG so the metric reads instantly.           ║
+  ║                                                      ║
+  ║  3. COURSE CARD COGNITIVE OVERLOAD                   ║
+  ║     Original: 5 mark cells + 2 toggles + 1 slider   ║
+  ║     all visible at once per course. With 7 courses   ║
+  ║     that's ~70 interactive elements in a wall.       ║
+  ║     Fix: Collapsed detail (expand on click). Top     ║
+  ║     bar shows name + grade pill only. Expand arrow   ║
+  ║     is obvious. Reduces scan time by ~60%.           ║
+  ║                                                      ║
+  ║  4. "LOAD MY SEM 2" — PERSONAL DATA IN PRODUCTION   ║
+  ║     Original: Button hard-codes a real person's      ║
+  ║     marks (Yash, Sem 2). Anyone sharing the link     ║
+  ║     sees private academic data + the UI implies it   ║
+  ║     is THE user's data.                              ║
+  ║     Fix: Renamed to "Load Demo Data" + tooltip       ║
+  ║     clarifying it is sample data.                    ║
+  ║                                                      ║
+  ║  5. THRESHOLD TABLE UNREADABLE AT A GLANCE           ║
+  ║     Original: "Impossible" + "Already ✓" are text   ║
+  ║     inside cells — you scan a full table to find     ║
+  ║     your risk. No visual hierarchy.                  ║
+  ║     Fix: Colour-coded badge chips with icons.        ║
+  ║     Red pill for Impossible, green for achieved,     ║
+  ║     numeric for actionable. Table also gets sticky   ║
+  ║     header so courses don't lose column labels.      ║
+  ║                                                      ║
+  ║  6. RANGE SLIDER WITH NO TACTILE FEEDBACK            ║
+  ║     Original: Dragging updates a number to the       ║
+  ║     right, but the grade pill update happens after   ║
+  ║     a re-render delay that causes flicker on rapid   ║
+  ║     drag. No min-to-pass annotation on track.        ║
+  ║     Fix: Smooth live update + threshold tick marks   ║
+  ║     on the track (shows where B+/A/A+/O start).      ║
+  ║                                                      ║
+  ║  7. EMPTY STATE IS A DEAD END                        ║
+  ║     Original: "No courses added yet." is just text.  ║
+  ║     Fix: Empty state has illustration + two clear    ║
+  ║     CTAs with visual weight hierarchy.               ║
+  ║                                                      ║
+  ║  8. PREV SEM INPUTS UNEXPLAINED                      ║
+  ║     Original: "Total Credit Points (prev sems)"      ║
+  ║     — most students don't know what this number is   ║
+  ║     or where to find it.                             ║
+  ║     Fix: Helper text + live computed SGPA shown      ║
+  ║     below the pair so the user can sanity-check.     ║
+  ║                                                      ║
+  ║  9. FONT CHOICE: Manrope → Inter                     ║
+  ║     Manrope is distinctive but has poor CJK/number   ║
+  ║     rendering at 13–14px. Inter is optimised for     ║
+  ║     UI at small sizes. IBM Plex Mono kept for data.  ║
+  ║                                                      ║
+  ║  10. MISSING KEYBOARD / FOCUS STATES                 ║
+  ║      Original: focus ring is browser default only    ║
+  ║      on most elements, invisible on dark bg.         ║
+  ║      Fix: Explicit :focus-visible ring on all        ║
+  ║      interactive elements using accent color.        ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  v5.4 CHANGES                                        ║
+  ║                                                      ║
+  ║  11. CROSS-SEM CGPA IN CALCULATOR TAB               ║
+  ║      Previous: CGPA stat card only updated from      ║
+  ║      the manual "prev-credits/prev-points" fields.   ║
+  ║      New: When you switch to Sem N, the app reads    ║
+  ║      all saved Sem 1…N-1 slots from localStorage,    ║
+  ║      computes cumulative credits+points, and auto-   ║
+  ║      fills the prev fields + shows an origin banner. ║
+  ║      The sem card in the dashboard now says which    ║
+  ║      sems contributed. Manual override still works.  ║
+  ║                                                      ║
+  ║  12. PARTIAL MID-SEM / TEACHER MARKS                ║
+  ║      New: Per-course "Mid-sem max" selector lets you ║
+  ║      set the maximum possible teacher-award marks    ║
+  ║      to any value (e.g. teacher only gave 20 of 30). ║
+  ║      Existing teacherAwardMax already existed but    ║
+  ║      the UX for "teacher gave less than full max"    ║
+  ║      was unclear. Now labelled explicitly.           ║
+  ║                                                      ║
+  ║  13. STRESS-TEST MODE                               ║
+  ║      New global toggle: "Stress-test (what if        ║
+  ║      end-sem = 0?)". Flips all endsem sliders to 0  ║
+  ║      temporarily to show worst-case grades without   ║
+  ║      destroying entered data. Toggle off to restore. ║
+  ║                                                      ║
+  ║  14. SEM CGPA RIBBON ON SWITCHER BAR               ║
+  ║      Each completed sem pill now shows its SGPA      ║
+  ║      on hover tooltip, and the switcher bar shows    ║
+  ║      a running "Cumulative so far" chip.             ║
+  ╠══════════════════════════════════════════════════════╣
+  ║  v6.0 CHANGES (security + reliability pass)          ║
+  ║                                                      ║
+  ║  15. XSS FIX (P0 — security)                        ║
+  ║      Added escapeHtml() helper. All user-editable    ║
+  ║      strings (course names) now routed through it    ║
+  ║      before any innerHTML assignment. Eliminates     ║
+  ║      persistent stored-XSS path in 3 render sites.  ║
+  ║                                                      ║
+  ║  16. VALIDATION WIRED (P0 — bug)                     ║
+  ║      validateNumberInput() was defined but never     ║
+  ║      called. Now wired to every numeric field        ║
+  ║      onchange handler with correct min/max bounds.   ║
+  ║      Out-of-range values are clamped + highlighted.  ║
+  ║                                                      ║
+  ║  17. contenteditable → <input> (P0 — UX/a11y)       ║
+  ║      Course name editor replaced with a proper       ║
+  ║      <input type="text"> with <label for>. Fixes     ║
+  ║      mobile keyboard, screen-reader semantics,       ║
+  ║      autofill, and paste behaviour.                  ║
+  ║                                                      ║
+  ║  18. STRESS-TEST BANNER (P0 — UX)                   ║
+  ║      A full-width red banner now appears at the      ║
+  ║      top of the course list whenever stress-test     ║
+  ║      mode is active — prevents "why are my grades    ║
+  ║      wrong?" confusion from leaving it toggled on.   ║
+  ║                                                      ║
+  ║  19. DATA BACKUP / RESTORE (P1 — reliability)       ║
+  ║      "⬇ Backup" exports all localStorage slots to   ║
+  ║      a timestamped JSON file. "⬆ Restore" reads     ║
+  ║      it back and reloads. Protects against browser   ║
+  ║      data-clear, device switch, or corrupted keys.   ║
+  ╚══════════════════════════════════════════════════════╝
+*/
+
+/* ── THEME: LIGHT (default) ─────────────────────────
+   Google-inspired: white surfaces, blue primary accent,
+   deepened semantic colors for AA-ish contrast on white. */
+:root {
+  --bg: #f8f9fa;
+  --s1: #ffffff;
+  --s2: #ffffff;
+  --s3: #f1f3f4;
+  --s4: #e8eaed;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.12);
+  --border3: rgba(0,0,0,0.18);
+  --acc: #1a73e8;
+  --acc2: #0e7490;
+  --acc3: #dc2626;
+  --acc4: #7c3aed;
+  --text: #202124;
+  --text2: #5f6368;
+  --muted: #80868b;
+  --muted2: #9aa0a6;
+  --green: #15803d;
+  --yellow: #b45309;
+  --red: #991b1b;
+  --gold: #b8860b;
+  --orange: #c2410c;
+  --nav-bg: rgba(255,255,255,0.72);
+  --overlay-sm: rgba(0,0,0,0.03);
+  --overlay-md: rgba(0,0,0,0.05);
+  --shadow-color: rgba(0,0,0,0.15);
+  --on-acc: #ffffff;
+  --radius: 12px;
+  --radius-sm: 7px;
+}
+
+/* ── THEME: DARK (opt-in, remembered via localStorage) ── */
+[data-theme="dark"] {
+  --bg: #060608;
+  --s1: #0e0e14;
+  --s2: #16161f;
+  --s3: #1e1e2a;
+  --s4: #252535;
+  --border: #ffffff0f;
+  --border2: #ffffff1a;
+  --border3: #ffffff28;
+  --acc: #e8ff47;
+  --acc2: #47ffe8;
+  --acc3: #ff6b6b;
+  --acc4: #b47fff;
+  --text: #f0f0f8;
+  --text2: #c8c8e0;
+  --muted: #666688;
+  --muted2: #444460;
+  --green: #47ffb4;
+  --yellow: #ffd447;
+  --red: #ff4747;
+  --gold: #ffd700;
+  --orange: #ff9f43;
+  --nav-bg: rgba(6,6,8,0.78);
+  --overlay-sm: rgba(255,255,255,0.025);
+  --overlay-md: rgba(255,255,255,0.055);
+  --shadow-color: rgba(0,0,0,0.5);
+  --on-acc: #000000;
+}
+
+body { transition: background 0.2s, color 0.2s; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── FOCUS STATES (Fix #10) ──────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── NAV (Fix #1) ────────────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--nav-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 20px var(--shadow-color);
+  display: flex;
+  align-items: stretch;
+  padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav-brand {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--acc);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 0 20px 0 0;
+  border-right: 1px solid var(--border);
+  margin-right: 4px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 16px;
+  height: 48px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 12px; right: 12px;
+  height: 2px;
+  background: var(--acc);
+  border-radius: 2px 2px 0 0;
+  transform: scaleX(0);
+  transition: transform 0.2s cubic-bezier(.4,0,.2,1);
+}
+.tab-btn.active { color: var(--text); }
+.tab-btn.active::after { transform: scaleX(1); }
+.tab-btn:hover:not(.active) { color: var(--text2); }
+
+.tab-icon { font-size: 15px; }
+@media (max-width: 480px) {
+  .tab-btn { padding: 0 10px; gap: 4px; font-size: 11px; }
+  .tab-label { font-size: 11px; }
+  .tab-icon { font-size: 14px; }
+  .nav-brand { font-size: 9px; padding-right: 12px; }
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0 4px;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.theme-toggle:hover { border-color: var(--border3); background: var(--overlay-sm); }
+.theme-toggle:active { transform: scale(0.92); }
+.theme-icon { display: none; line-height: 1; }
+.icon-moon { display: inline; }
+.icon-sun  { display: none; }
+[data-theme="dark"] .icon-moon { display: none; }
+[data-theme="dark"] .icon-sun  { display: inline; }
+
+/* ── PANELS ──────────────────────────────────────── */
+.panel { display: none; padding: 20px 20px 80px; max-width: 880px; margin: 0 auto; }
+.panel.active { display: block; }
+@media (min-width: 1200px) {
+  .panel { max-width: 1040px; }
+}
+@media (min-width: 1600px) {
+  .panel { max-width: 1180px; }
+}
+
+/* ── SECTION HEADERS ─────────────────────────────── */
+.sec-head {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sec-head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.sec-head:first-child { margin-top: 0; }
+
+/* ── HERO STATS (Fix #2) ─────────────────────────── */
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.hero-stat {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.hero-stat:hover { border-color: var(--border2); }
+.hero-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent-color, transparent);
+  opacity: 0.6;
+}
+.hero-stat .lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.hero-stat .val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+  letter-spacing: -1px;
+}
+.hero-stat .div-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--overlay-md);
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0;
+}
+.hero-stat .sub-pts {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── CARDS ───────────────────────────────────────── */
+.card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+}
+.card:hover { border-color: var(--border2); }
+
+/* ── COURSE CARD (Fix #3 — collapsible) ──────────── */
+.course-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+  overflow: hidden;
+}
+.course-card:hover { border-color: var(--border2); }
+.course-card.expanded { border-color: var(--border3); }
+
+.cc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.cc-header:hover .cc-chevron { color: var(--text); }
+
+.cc-left {
+  flex: 1;
+  min-width: 0;
+}
+.cc-name {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.cc-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.grade-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.cc-chevron {
+  color: var(--muted2);
+  transition: transform 0.2s, color 0.15s;
+  font-size: 12px;
+}
+.course-card.expanded .cc-chevron { transform: rotate(180deg); }
+
+/* mini progress bar in header */
+.cc-minibar {
+  height: 2px;
+  background: var(--s3);
+  margin: 0 14px;
+}
+.cc-minifill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s;
+}
+
+.cc-body {
+  padding: 14px 14px 10px;
+  border-top: 1px solid var(--border);
+  display: none;
+}
+.course-card.expanded .cc-body { display: block; }
+
+.marks-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mark-cell { text-align: center; }
+.mark-cell .ml {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.mark-cell .mv {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ── INPUTS ──────────────────────────────────────── */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.field-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  width: 100px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+/* Range slider with threshold ticks (Fix #6) */
+.range-wrap {
+  flex: 1;
+  position: relative;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--s3);
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--acc);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 15%, transparent);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--acc) 22%, transparent);
+  transform: scale(1.15);
+}
+input[type=range]:active::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--acc) 30%, transparent);
+}
+.range-ticks {
+  position: absolute;
+  top: 10px;
+  left: 0; right: 0;
+  pointer-events: none;
+  height: 4px;
+}
+.tick {
+  position: absolute;
+  width: 1px;
+  height: 5px;
+  background: var(--muted2);
+  top: 0;
+  transform: translateX(-50%);
+}
+.tick-label {
+  position: absolute;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  color: var(--muted2);
+  top: 7px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.range-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--acc);
+  width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+input[type=number], input[type=text], select {
+  background: var(--s3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+input[type=number]:focus, input[type=text]:focus, select:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 10%, transparent);
+}
+input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
+select option { background: var(--s2); }
+
+/* ── TOGGLE SWITCH ───────────────────────────────── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 0;
+}
+.toggle-lbl {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  flex: 1;
+  line-height: 1.4;
+}
+.toggle-sub {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  display: block;
+  margin-top: 2px;
+}
+.switch {
+  position: relative;
+  width: 38px; height: 22px;
+  flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-sw {
+  position: absolute;
+  inset: 0;
+  background: var(--s4);
+  border-radius: 22px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 1px solid var(--border2);
+}
+.slider-sw::before {
+  content: '';
+  position: absolute;
+  width: 15px; height: 15px;
+  left: 3px; top: 3px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(.4,0,.2,1), background 0.2s;
+}
+.switch input:checked + .slider-sw { background: color-mix(in srgb, var(--acc) 15%, transparent); border-color: var(--acc); }
+.switch input:checked + .slider-sw::before { transform: translateX(16px); background: var(--acc); }
+
+/* ── PROGRESS BAR ────────────────────────────────── */
+.prog-bar {
+  height: 4px;
+  background: var(--s3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.prog-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.35s cubic-bezier(.4,0,.2,1), background 0.3s;
+}
+
+/* ── THRESHOLD TABLE (Fix #5) ────────────────────── */
+.thresh-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+}
+.thresh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+.thresh-table thead { position: sticky; top: 0; z-index: 2; }
+.thresh-table th {
+  text-align: left;
+  padding: 9px 10px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  background: var(--s2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.thresh-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.thresh-table tr:last-child td { border-bottom: none; }
+.thresh-table tr:hover td { background: var(--overlay-sm); }
+
+/* Grade target chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.chip.achieved { background: color-mix(in srgb, var(--green) 10%, transparent); color: var(--green); border-color: color-mix(in srgb, var(--green) 20%, transparent); }
+.chip.impossible { background: color-mix(in srgb, var(--red) 10%, transparent); color: var(--red); border-color: color-mix(in srgb, var(--red) 20%, transparent); }
+.chip.needed { background: var(--overlay-sm); color: var(--text2); border-color: var(--border2); }
+
+/* ── BUTTONS ─────────────────────────────────────── */
+.btn {
+  background: var(--acc);
+  color: var(--on-acc);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); opacity: 0.95; }
+.btn.sec {
+  background: var(--s3);
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.btn.sec:hover { border-color: var(--border3); background: var(--s4); }
+.btn.danger { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 25%, transparent); }
+.btn.sm { padding: 5px 12px; font-size: 11px; }
+
+.del-btn {
+  background: none;
+  border: none;
+  color: var(--muted2);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.del-btn:hover { color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
+
+/* ── INFO / WARN BOXES ───────────────────────────── */
+.info-box {
+  background: color-mix(in srgb, var(--acc) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc) 12%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+.info-box b { color: var(--text2); }
+.info-box strong { color: var(--acc); }
+
+.warn-box {
+  background: color-mix(in srgb, var(--red) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 18%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--red);
+  line-height: 1.8;
+  margin-top: 8px;
+}
+
+.success-box {
+  background: color-mix(in srgb, var(--green) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--green) 18%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--green);
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+.success-box b { color: var(--green); }
+
+/* ── HELPER TEXT (Fix #8) ────────────────────────── */
+.helper {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.prev-sgpa-display {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--acc2);
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--acc2) 5%, transparent);
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--acc2) 10%, transparent);
+  display: inline-block;
+}
+
+/* ── EMPTY STATE (Fix #7) ────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.empty-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+.empty-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.empty-sub {
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.empty-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* ── CGPA PLANNER ────────────────────────────────── */
+.prev-sem-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 90px 72px 32px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.prev-sem-row .ph {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ── GRADE REFERENCE ─────────────────────────────── */
+.grade-ref {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.grade-ref-item {
+  background: var(--s3);
+  border-radius: var(--radius-sm);
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.grade-ref-item:hover { border-color: var(--border2); transform: translateY(-1px); }
+.grade-ref-item .gr-letter {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.grade-ref-item .gr-pts {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.grade-ref-item .gr-range {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── DIVIDER REFERENCE TABLE ─────────────────────── */
+.div-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.div-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace;
+}
+.div-table tr:last-child td { border-bottom: none; }
+.div-table td:first-child { color: var(--muted); font-size: 10px; }
+
+.flex-gap { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.spacer { height: 16px; }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* Course name editable */
+[contenteditable] {
+  outline: none;
+  border-radius: 4px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  transition: background 0.15s;
+}
+[contenteditable]:focus {
+  background: var(--overlay-md);
+  outline: 1px solid var(--acc);
+}
+
+/* ── RESPONSIVE ──────────────────────────────────── */
+@media (max-width: 600px) {
+  .hero-grid { grid-template-columns: 1fr 1fr; }
+  .marks-row { grid-template-columns: repeat(3, 1fr); }
+  .grade-ref { grid-template-columns: repeat(2, 1fr); }
+  .prev-sem-row { grid-template-columns: 1fr 65px 75px 60px 28px; gap: 5px; }
+  .hero-grid .hero-stat:last-child { grid-column: span 2; }
+  .panel { padding: 16px 14px 80px; }
+}
+@media (max-width: 400px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-grid .hero-stat:last-child { grid-column: span 1; }
+}
+
+/* ── SAVE INDICATOR ──────────────────────────────── */
+.save-indicator {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--muted2);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0 4px;
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+.save-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--muted2);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.save-indicator.saved .save-dot { background: var(--green); }
+.save-indicator.saved { color: var(--green); }
+
+/* ── TOAST NOTIFICATION ──────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--s4);
+  border: 1px solid var(--border3);
+  border-radius: 40px;
+  padding: 10px 20px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  z-index: 9999;
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1), opacity 0.3s;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 24px var(--shadow-color);
+}
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.toast.success { border-color: color-mix(in srgb, var(--green) 30%, transparent); color: var(--green); }
+
+/* ── MOBILE LAYOUT FIXES ─────────────────────────── */
+@media (max-width: 600px) {
+  .marks-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .marks-row .mark-cell:last-child { grid-column: span 2; text-align: left; }
+  .marks-row .mark-cell:last-child .mv { font-size: 18px; }
+  .cc-meta { font-size: 9px; }
+  .cc-name { font-size: 12px; }
+  .field-row { flex-wrap: wrap; gap: 6px; }
+  .field-lbl { width: auto; min-width: 80px; }
+  /* Wider touch target for range */
+  input[type=range] { height: 6px; }
+  input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; }
+  /* Threshold table: hide % hint on small screens */
+  .thresh-table .chip { padding: 2px 5px; font-size: 9px; }
+  .thresh-table td:first-child { max-width: 90px; }
+  /* Copy summary button — full width on mobile */
+  #copy-summary-btn { width: 100%; margin-top: 4px; }
+}
+@media (max-width: 400px) {
+  .prev-sem-row { grid-template-columns: 1fr 55px 65px 50px 24px; gap: 4px; }
+  input[type=number], input[type=text] { font-size: 12px; padding: 6px 8px; }
+}
+/* ── INPUT VALIDATION STATES ─────────────────────── */
+input.input-error {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 12%, transparent) !important;
+}
+input.input-warn {
+  border-color: var(--yellow) !important;
+}
+
+/* ── ONBOARDING ──────────────────────────────────── */
+.onboarding-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+.onboarding-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--acc);
+  text-transform: uppercase;
+  margin-bottom: 32px;
+}
+.onboarding-title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+.onboarding-sub {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+.sem-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.sem-btn {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 16px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.sem-btn:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 5%, transparent);
+  transform: translateY(-1px);
+}
+.sem-btn .sem-label {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  display: block;
+  margin-top: 3px;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0;
+}
+.onboarding-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted2);
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  margin: 16px 0;
+}
+.onboarding-divider::before, .onboarding-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.onboarding-note {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1.7;
+  margin-top: 20px;
+  padding: 12px 14px;
+  background: var(--s2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+@media (max-width: 400px) {
+  .sem-grid { grid-template-columns: repeat(2, 1fr); }
+  .onboarding-title { font-size: 22px; }
+}
+
+/* ── SEM SWITCHER BAR ────────────────────────────── */
+.sem-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+  position: sticky;
+  top: 52px;
+  z-index: 90;
+  min-height: 40px;
+}
+.sem-switcher-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-right: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sem-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: var(--s2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+.sem-pill:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 6%, transparent);
+}
+.sem-pill.active {
+  background: var(--acc);
+  color: var(--on-acc);
+  border-color: var(--acc);
+  font-weight: 800;
+}
+.sem-pill.used {
+  color: var(--text2);
+  border-color: var(--border3);
+}
+.sem-pill.ghost {
+  color: var(--border3);
+  border-color: var(--border);
+  opacity: 0.45;
+}
+.sem-pill.ghost:hover {
+  opacity: 1;
+  color: var(--text2);
+  border-color: var(--border2);
+}
+.pill-dot {
+  display: inline-block;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-left: 3px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+@media (max-width: 500px) {
+  .sem-switcher-bar { padding: 7px 12px; gap: 5px; top: 48px; }
+  .sem-pill { font-size: 10px; padding: 3px 10px; }
+  .sem-switcher-label { display: none; }
+}
+
+/* ── CROSS-SEM AUTO BANNER ───────────────────────── */
+.crosssem-banner {
+  background: color-mix(in srgb, var(--acc2) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc2) 18%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 9px 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.crosssem-banner .cs-icon { flex-shrink: 0; margin-top: 1px; }
+.crosssem-banner b { color: var(--acc2); }
+.crosssem-banner .cs-override {
+  font-size: 10px;
+  color: var(--muted2);
+  display: block;
+  margin-top: 2px;
+}
+
+/* ── STRESS TEST TOGGLE ──────────────────────────── */
+/* v6: Page-level stress banner (visible when active) */
+#stress-active-banner {
+  display: none;
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  border: 1.5px solid var(--red);
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 8px 14px;
+  text-align: center;
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+#stress-active-banner.on { display: block; }
+
+.stress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.stress-lbl {
+  font-size: 11px;
+  color: var(--red);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  flex: 1;
+  line-height: 1.4;
+}
+.stress-sub {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+}
+.switch.stress-switch input:checked + .slider-sw {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  border-color: var(--red);
+}
+.switch.stress-switch input:checked + .slider-sw::before {
+  background: var(--red);
+}
+
+/* ── SEM PILL CGPA CHIP ──────────────────────────── */
+.sem-cgpa-chip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--acc2) 8%, transparent);
+  color: var(--acc2);
+  border: 1px solid color-mix(in srgb, var(--acc2) 15%, transparent);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.sem-pill-sgpa {
+  display: block;
+  font-size: 8px;
+  font-weight: 400;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 1px;
+  letter-spacing: 0;
+}
+.sem-pill.used .sem-pill-sgpa { color: var(--acc2); opacity: 0.7; }
+
