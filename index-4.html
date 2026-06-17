@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doon University · Grade Calculator v6.0</title>
+<link rel="stylesheet" href="styles.css">
+<!-- Vercel Web Analytics — keep this when replacing index.html; it's not auto-injected for plain static sites -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-brand">DOON · NEP 2020</div>
+  <div class="save-indicator" id="save-indicator"><span class="save-dot"></span><span id="save-label">auto-saved</span></div>
+  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+    <span class="theme-icon icon-sun">☀️</span>
+    <span class="theme-icon icon-moon">🌙</span>
+  </button>
+  <button class="tab-btn active" data-tab="calc" onclick="showTab('calc', this)">
+    <span class="tab-icon">📊</span>
+    <span class="tab-label">Sem Calculator</span>
+  </button>
+  <button class="tab-btn" data-tab="planner" onclick="showTab('planner', this)">
+    <span class="tab-icon">🎯</span>
+    <span class="tab-label">CGPA Planner</span>
+  </button>
+  <button class="tab-btn" data-tab="ref" onclick="showTab('ref', this)">
+    <span class="tab-icon">📋</span>
+    <span class="tab-label">Grade Reference</span>
+  </button>
+
+  <!-- Mobile-only: hamburger replaces the 3 tabs below 768px so there's
+       nothing to discover by sliding — tap it, a panel of all 3 pages appears. -->
+  <div class="nav-menu-wrap">
+    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu(event)" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+<div class="mobile-menu-overlay" id="mobile-menu-overlay" onclick="closeMobileMenu()"></div>
+<div class="mobile-menu-panel" id="mobile-menu-panel" role="menu">
+  <button class="menu-item active" data-tab="calc" onclick="showTab('calc', this)" role="menuitem">
+    <span class="tab-icon">📊</span><span>Sem Calculator</span>
+  </button>
+  <button class="menu-item" data-tab="planner" onclick="showTab('planner', this)" role="menuitem">
+    <span class="tab-icon">🎯</span><span>CGPA Planner</span>
+  </button>
+  <button class="menu-item" data-tab="ref" onclick="showTab('ref', this)" role="menuitem">
+    <span class="tab-icon">📋</span><span>Grade Reference</span>
+  </button>
+</div>
+
+<!-- Sem Switcher Bar (persistent, below nav) -->
+<div id="sem-switcher-bar" class="sem-switcher-bar" style="display:none;"></div>
+
+<!-- ══════════════════════════════════════════════════
+     ONBOARDING (shown only on first visit)
+══════════════════════════════════════════════════ -->
+<div id="onboarding" style="display:none;">
+  <div class="onboarding-wrap">
+    <div class="onboarding-logo">Doon University · CSE · NEP 2020</div>
+    <div class="onboarding-title">Your grade calculator,<br>set up in 10 seconds.</div>
+    <div class="onboarding-sub">Pick your current semester and your courses load automatically. Just enter your marks.</div>
+
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Which semester are you in?</div>
+    <div class="sem-grid">
+      <button class="sem-btn" onclick="quickSetup(1)">Sem 1<span class="sem-label">1st Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(2)">Sem 2<span class="sem-label">1st Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(3)">Sem 3<span class="sem-label">2nd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(4)">Sem 4<span class="sem-label">2nd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(5)">Sem 5<span class="sem-label">3rd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(6)">Sem 6<span class="sem-label">3rd Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(7)">Sem 7<span class="sem-label">Final Year</span></button>
+      <button class="sem-btn" onclick="quickSetup(8)">Sem 8<span class="sem-label">Final Year</span></button>
+    </div>
+
+    <div class="onboarding-divider">or</div>
+    <button class="btn sec" style="width:100%;" onclick="skipOnboarding()">Start with a blank slate — I'll add courses manually</button>
+
+    <div class="onboarding-note">
+      ✦ Your data stays in your browser — nothing is sent anywhere.<br>
+      ✦ All your marks auto-save as you type.<br>
+      ✦ You can edit course names, credits, and marking schemes per course.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MAIN CONTENT (hidden until onboarding done)
+══════════════════════════════════════════════════ -->
+<div id="main-content" style="display:none;">
+
+<!-- ══════════════════════════════════════════════════
+     TAB 1 · SEM CALCULATOR
+══════════════════════════════════════════════════ -->
+<div class="panel active" id="tab-calc">
+
+  <!-- Hero stats -->
+  <div class="hero-grid">
+    <div class="hero-stat" style="--accent-color: var(--acc)">
+      <div class="lbl">Sem SGPA</div>
+      <div class="val" id="h-sgpa" style="color:var(--acc)">—</div>
+      <span class="div-badge" id="h-sgpa-div">add courses</span>
+    </div>
+    <div class="hero-stat" style="--accent-color: var(--acc2)">
+      <div class="lbl">Credit Points</div>
+      <div class="val" id="h-pts" style="color:var(--acc2)">—</div>
+      <div class="sub-pts" id="h-credits">/ 0 credits</div>
+    </div>
+    <!-- v5.5: On Sem 1 shows "Sem 1 only" info; from Sem 2+ shows CGPA -->
+    <div class="hero-stat" id="hero-cgpa-card" style="--accent-color: var(--acc4)">
+      <div class="lbl" id="h-cgpa-lbl">CGPA (all sems)</div>
+      <div class="val" id="h-cgpa" style="color:var(--acc4)">—</div>
+      <span class="div-badge" id="h-cgpa-div">set prev below</span>
+    </div>
+  </div>
+
+  <!-- v5.5: Hidden on Sem 1 via updateSem1UI() -->
+  <div id="prev-sem-section">
+  <!-- Previous semester data (Fix #8 — helper text added) -->
+  <div class="sec-head">Previous Semester Data</div>
+  <!-- v5.4: Auto-filled from saved sem slots — shows origin -->
+  <div id="crosssem-banner" style="display:none;" class="crosssem-banner">
+    <span class="cs-icon">⚡</span>
+    <div>
+      <b id="cs-text">Auto-computed from your saved semesters</b>
+      <span class="cs-override" id="cs-sub">You can still edit the fields below to override.</span>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div class="field-lbl" style="margin-bottom:5px;">Credits Earned (all prev sems)</div>
+        <input type="number" id="prev-credits" value="" min="0" placeholder="e.g. 22" oninput="onPrevFieldEdit()">
+        <div class="helper">Your marksheet → "Total Credits"</div>
+      </div>
+      <div>
+        <div class="field-lbl" style="margin-bottom:5px;">Credit Points (all prev sems)</div>
+        <input type="number" id="prev-points" value="" min="0" placeholder="e.g. 177" oninput="onPrevFieldEdit()">
+        <div class="helper">Credits × Grade Points, summed across all subjects</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;" id="prev-sgpa-check"></div>
+  </div>
+  </div><!-- /prev-sem-section -->
+
+  <!-- Global settings + actions -->
+  <div class="sec-head">Semester Courses</div>
+  <div class="card">
+    <div class="toggle-row">
+      <div>
+        <span class="toggle-lbl">Mid-sem contributes half weight</span>
+        <span class="toggle-sub">ON → MidSem/30 counts as max 15 marks (common at Doon Univ)</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="global-halved" checked onchange="recalcAll()">
+        <span class="slider-sw"></span>
+      </label>
+    </div>
+    <div class="flex-gap" style="margin-top:4px;">
+      <button class="btn" onclick="addCourse()">+ Add Course</button>
+      <button class="btn sec" onclick="loadDemo()" title="Load sample Semester 2 data (demo only)">Load Demo Data</button>
+      <button class="btn sec sm danger" onclick="clearCourses()">Clear All</button>
+    </div>
+    <div class="flex-gap" style="margin-top:8px;">
+      <button class="btn sec sm" id="copy-summary-btn" onclick="copySummary()" title="Copy a plain-text summary to clipboard">📋 Copy Summary</button>
+      <button class="btn sec sm" onclick="shareCard()" title="Generate a shareable image card">🖼 Share Card</button>
+      <button class="btn sec sm" onclick="exportData()" title="Download all your data as a JSON backup">⬇ Backup</button>
+      <label class="btn sec sm" title="Restore from a previously downloaded backup" style="cursor:pointer;">⬆ Restore<input type="file" accept=".json" onchange="importData(this)" style="display:none;"></label>
+    </div>
+  </div>
+
+  <div id="courses-list"></div>
+
+  <!-- Threshold table (Fix #5 — chip badges, sticky header) -->
+  <div class="sec-head">End-Sem Targets — What you need to hit each grade</div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div class="thresh-wrap">
+      <table class="thresh-table" id="thresh-table">
+        <thead>
+          <tr>
+            <th style="padding-left:14px;">Course</th>
+            <th>Cr</th>
+            <th style="color:#ffd447">B+ (7pts)</th>
+            <th style="color:#47ffe8">A (8pts)</th>
+            <th style="color:#47ffb4">A+ (9pts)</th>
+            <th style="color:#ffd700">O (10pts)</th>
+          </tr>
+        </thead>
+        <tbody id="thresh-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 2 · CGPA PLANNER
+══════════════════════════════════════════════════ -->
+<div class="panel" id="tab-planner">
+  <div class="info-box">
+    <b>How to use:</b> Add your past semester results, set current semester credits + your target CGPA — and the calculator tells you exactly what SGPA you need to hit it this semester.
+  </div>
+
+  <div class="sec-head">Past Semester Results</div>
+  <div class="card">
+    <div class="prev-sem-row" style="margin-bottom:10px;">
+      <span class="ph">Semester</span>
+      <span class="ph">Credits</span>
+      <span class="ph">Cr. Pts</span>
+      <span class="ph">SGPA</span>
+      <span></span>
+    </div>
+    <div id="past-sems-list"></div>
+    <button class="btn sec sm" onclick="addPastSem()" style="margin-top:8px;">+ Add Semester</button>
+  </div>
+
+  <div class="sec-head">Current Semester</div>
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div class="field-lbl" style="margin-bottom:5px;">Current Sem Credits</div>
+      <input type="number" id="cur-credits-plan" value="22" min="1" oninput="calcPlan()">
+    </div>
+    <div>
+      <div class="field-lbl" style="margin-bottom:5px;">Target CGPA</div>
+      <input type="number" id="target-cgpa" value="8.00" min="0" max="10" step="0.01" oninput="calcPlan()">
+      <div class="helper">8.00+ = Distinction · 6.00+ = First Div</div>
+    </div>
+  </div>
+
+  <div class="sec-head">Required SGPA</div>
+  <div class="card" id="plan-result">
+    <div style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;">
+      Add past semesters and set a target to see your required SGPA.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 3 · GRADE REFERENCE
+══════════════════════════════════════════════════ -->
+<div class="panel" id="tab-ref">
+  <div class="sec-head">Grading Scale — NEP 2020</div>
+  <div class="grade-ref" style="margin-bottom:16px;">
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--gold)">O</div><div class="gr-pts">10 pts</div><div class="gr-range">90 – 100</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--green)">A+</div><div class="gr-pts">9 pts</div><div class="gr-range">80 – 89</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc4)">A</div><div class="gr-pts">8 pts</div><div class="gr-range">70 – 79</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc2)">B+</div><div class="gr-pts">7 pts</div><div class="gr-range">60 – 69</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--yellow)">B</div><div class="gr-pts">6 pts</div><div class="gr-range">50 – 59</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--orange)">C</div><div class="gr-pts">5 pts</div><div class="gr-range">40 – 49</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc3)">D</div><div class="gr-pts">4 pts</div><div class="gr-range">30 – 39</div></div>
+    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--red)">F</div><div class="gr-pts">0 pts</div><div class="gr-range">Below 30</div></div>
+  </div>
+
+  <div class="sec-head">Divisions</div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table class="div-table">
+      <tr><td>CGPA ≥ 8.00</td><td style="color:var(--green);font-weight:700;">★ First Division with Distinction</td><td style="color:var(--muted);font-size:10px;">Must clear all courses in first attempt</td></tr>
+      <tr><td>CGPA 6.00 – 7.99</td><td style="color:var(--acc4);font-weight:700;">First Division</td><td></td></tr>
+      <tr><td>CGPA 5.00 – 5.99</td><td style="color:var(--yellow);font-weight:700;">Second Division</td><td></td></tr>
+      <tr><td>CGPA 4.00 – 4.99</td><td style="color:var(--muted);font-weight:600;">Pass</td><td></td></tr>
+      <tr><td>CGPA below 4.00</td><td style="color:var(--red);font-weight:700;">Fail</td><td style="color:var(--muted);font-size:10px;">Repeat year if after even sem</td></tr>
+    </table>
+  </div>
+
+  <div class="sec-head">Evaluation Structure</div>
+  <div class="card">
+    <div class="info-box" style="margin-bottom:8px;">
+      <b>Mid-sem HALVED (most common):</b><br>
+      Internal /20 + MidSem/30 → capped at 15 + EndSem /50 or /70 → scaled to /100
+    </div>
+    <div class="info-box" style="margin-bottom:8px;">
+      <b>Mid-sem at full value:</b><br>
+      Internal(20) + MidSem(30) + EndSem(50) = 100 — only when mid-sem is NOT halved
+    </div>
+    <div class="info-box" style="margin-bottom:0;">
+      <b>Mid-sem not held (teacher awards):</b><br>
+      Teacher directly awards up to 30 marks. Total raw = Internal(20) + Teacher(30) + EndSem(70) = 120 → scaled to 100<br><br>
+      <b>SGPA</b> = Grade points × Credits ÷ Total credits (this semester)<br>
+      <b>CGPA</b> = Cumulative points ÷ Cumulative credits<br>
+      <b>Equivalent %</b> = CGPA × 10
+    </div>
+  </div>
+
+  <div class="sec-head">Promotion Rules</div>
+  <div class="card">
+    <div class="info-box" style="margin-bottom:0;">
+      • Odd → Even semester: promoted regardless of CGPA.<br>
+      • Even semester (2nd/4th): must achieve <b>CGPA ≥ 4.00</b> to continue.<br>
+      • Below 4.00 after even semester → must repeat the academic year.<br>
+      • No make-up exams. No grace marks.<br>
+      • Grade improvement: only for C or D, after program completion, within 1 year.
+    </div>
+  </div>
+</div>
+</div><!-- /main-content -->
+
+<footer class="site-footer">
+  Made by <strong>Yashvardhan Dobhal</strong> · CSE'29 · Doon University
+</footer>
+
+<script src="script.js"></script>
+<!-- ══════════════════════════════════════════════════
+     SHARE CARD MODAL
+══════════════════════════════════════════════════ -->
+<div id="share-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);overflow-y:auto;padding:24px 16px;">
+  <div style="max-width:420px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--acc);letter-spacing:2px;text-transform:uppercase;">Share Card</span>
+      <button onclick="closeShareModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px;">✕</button>
+    </div>
+    <canvas id="share-canvas" style="width:100%;border-radius:12px;display:block;"></canvas>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn" style="flex:1;" onclick="downloadCard()">⬇ Download Image</button>
+      <button class="btn sec" style="flex:1;" onclick="copyCardToClipboard()">📋 Copy to Clipboard</button>
+    </div>
+    <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);text-align:center;">1080 × 1920 px · sized for WhatsApp / Instagram status</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+</body>
+</html>
