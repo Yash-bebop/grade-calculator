@@ -1438,3 +1438,39 @@ input.input-warn {
   font-weight: 700;
 }
 
+
+/* ── SHARE CARD MODE TOGGLE ──────────────────────────
+   Dark/light switch for the exported share card. Lives on the modal's
+   fixed dark overlay regardless of site theme, so colors are hardcoded
+   (not theme vars) to stay legible either way. */
+.share-mode-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+.smt-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.55);
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.smt-btn:hover { color: rgba(255,255,255,0.85); }
+.smt-btn.active {
+  background: rgba(255,255,255,0.14);
+  color: #ffffff;
+}
