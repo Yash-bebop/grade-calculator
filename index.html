@@ -313,6 +313,10 @@
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--acc);letter-spacing:2px;text-transform:uppercase;">Share Card</span>
       <button onclick="closeShareModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px;">✕</button>
     </div>
+    <div class="share-theme-toggle">
+      <button id="share-theme-light" class="share-theme-btn" onclick="setShareCardTheme('light')">☀️ Light</button>
+      <button id="share-theme-dark" class="share-theme-btn" onclick="setShareCardTheme('dark')">🌙 Dark</button>
+    </div>
     <canvas id="share-canvas" style="width:100%;border-radius:12px;display:block;"></canvas>
     <div style="display:flex;gap:10px;margin-top:14px;">
       <button class="btn" style="flex:1;" onclick="downloadCard()">⬇ Download Image</button>

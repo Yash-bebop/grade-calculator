@@ -419,8 +419,15 @@ function fallbackCopy(text) {
 // ─── SHARE CARD (v6.1) ──────────────────────────────
 // Draws a 1080×1920 canvas card (WhatsApp/Instagram story size)
 // showing SGPA, CGPA, per-course grades, and division badge.
+//
+// The card has its own fixed "Wrapped"-style branded look, independent of
+// the live site's current theme — but the person can pick whether that
+// look is light or dark via the toggle in the share modal. Defaults to
+// light (matching the site's own default theme).
+let shareCardTheme = 'light';
+let shareCardData  = null; // cached inputs so we can redraw on theme toggle
 
-function shareCard() {
+async function shareCard() {
   const halvedGlobal = document.getElementById('global-halved').checked;
   const prevCr  = parseFloat(document.getElementById('prev-credits').value) || 0;
   const prevPts = parseFloat(document.getElementById('prev-points').value) || 0;
@@ -430,21 +437,57 @@ function shareCard() {
     return;
   }
 
-  // The exported card always keeps its own fixed dark, branded look
-  // (like a Wrapped-style share card) regardless of the live site theme.
-  // Force dark theme just for this draw, then restore whatever the user
-  // actually had active.
+  shareCardData = { halvedGlobal, prevCr, prevPts };
+
+  // Make sure the custom webfonts are actually loaded before measuring/
+  // drawing text. Without this, the canvas can briefly fall back to a
+  // wider system font on first use, which is what let grade letters spill
+  // out of their pill backgrounds — the pill sizing below is also made
+  // dynamic to guard against this regardless.
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch (e) {}
+  }
+
+  renderShareCard();
+  updateShareThemeButtons();
+  document.getElementById('share-modal').style.display = 'block';
+}
+
+// Redraws the card using whichever light/dark mode is currently selected.
+function renderShareCard() {
+  if (!shareCardData) return;
+  const { halvedGlobal, prevCr, prevPts } = shareCardData;
+
+  // Force the card's own theme just for this draw (independent of the
+  // live site's theme), so grade/division colors read from CSS variables
+  // come out correctly, then restore whatever the site actually had active.
   const prevTheme = document.documentElement.getAttribute('data-theme');
-  document.documentElement.setAttribute('data-theme', 'dark');
+  document.documentElement.setAttribute('data-theme', shareCardTheme);
   try {
-    shareCardDraw(halvedGlobal, prevCr, prevPts);
+    shareCardDraw(halvedGlobal, prevCr, prevPts, shareCardTheme);
   } finally {
     if (prevTheme) document.documentElement.setAttribute('data-theme', prevTheme);
     else document.documentElement.removeAttribute('data-theme');
   }
 }
 
-function shareCardDraw(halvedGlobal, prevCr, prevPts) {
+function setShareCardTheme(mode) {
+  shareCardTheme = mode === 'dark' ? 'dark' : 'light';
+  updateShareThemeButtons();
+  renderShareCard();
+}
+
+function updateShareThemeButtons() {
+  const lightBtn = document.getElementById('share-theme-light');
+  const darkBtn  = document.getElementById('share-theme-dark');
+  if (!lightBtn || !darkBtn) return;
+  lightBtn.classList.toggle('active', shareCardTheme === 'light');
+  darkBtn.classList.toggle('active', shareCardTheme === 'dark');
+}
+
+function shareCardDraw(halvedGlobal, prevCr, prevPts, cardTheme) {
+
+  const isDark = cardTheme === 'dark';
 
   // ── Compute data ──
   let totalPts = 0, totalCr = 0;
@@ -464,6 +507,18 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
   const cgpa = cgpaCredits > 0 ? cgpaPoints / cgpaCredits : null;
   const sd = divLabel(sgpa);
 
+  // ── Palette (light vs dark card look) ──
+  const textPrimary   = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(20,20,32,0.86)';
+  const textSecondary = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(20,20,32,0.48)';
+  const textMuted      = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(20,20,32,0.34)';
+  const textFaint      = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(20,20,32,0.30)';
+  const lineColor      = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(20,20,32,0.09)';
+  const lineColorSoft  = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(20,20,32,0.11)';
+  const gridColor      = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(20,20,32,0.035)';
+  const rowStripe      = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(20,20,32,0.035)';
+  const cgpaBoxBg      = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(20,20,32,0.045)';
+  const glowAlpha      = isDark ? '22' : '12';
+
   // ── Canvas setup ──
   const W = 1080, H = 1920;
   const canvas = document.getElementById('share-canvas');
@@ -472,21 +527,27 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
 
   // Background gradient
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#060608');
-  bg.addColorStop(0.5, '#0d0d18');
-  bg.addColorStop(1, '#060608');
+  if (isDark) {
+    bg.addColorStop(0, '#060608');
+    bg.addColorStop(0.5, '#0d0d18');
+    bg.addColorStop(1, '#060608');
+  } else {
+    bg.addColorStop(0, '#ffffff');
+    bg.addColorStop(0.5, '#f3f4f9');
+    bg.addColorStop(1, '#ffffff');
+  }
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
   // Subtle grid pattern
-  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
   for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
   // Accent glow top
   const glow = ctx.createRadialGradient(W/2, 0, 0, W/2, 0, 600);
-  glow.addColorStop(0, sd.color + '22');
+  glow.addColorStop(0, sd.color + glowAlpha);
   glow.addColorStop(1, 'transparent');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, 600);
@@ -497,12 +558,12 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
   ctx.textAlign = 'center';
   ctx.fillText('DOON UNIVERSITY · CSE', W/2, 120);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillStyle = textFaint;
   ctx.font = '400 26px "IBM Plex Mono", monospace';
   ctx.fillText(`SEM ${activeSem || ''}  ·  RESULT CARD`, W/2, 168);
 
   // Divider line
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.strokeStyle = lineColorSoft;
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(80, 200); ctx.lineTo(W - 80, 200); ctx.stroke();
 
@@ -516,7 +577,7 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
   roundRect(ctx, 80, 230, W - 160, 280, 24);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(255,255,255,0.40)';
+  ctx.fillStyle = textSecondary;
   ctx.font = '500 30px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('SEMESTER GPA', W/2, 290);
@@ -542,11 +603,11 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
   let nextY = 560;
   if (cgpa !== null) {
     const cd = divLabel(cgpa);
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillStyle = cgpaBoxBg;
     roundRect(ctx, 80, nextY, W - 160, 110, 16);
     ctx.fill();
 
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillStyle = textSecondary;
     ctx.font = '500 24px Inter, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('CUMULATIVE CGPA', 130, nextY + 44);
@@ -560,23 +621,32 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
   }
 
   // ── Course table ──
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  // Layout (left → right): course name · credits · grade pill.
+  // The grade pill's width is measured from its own text at draw time so
+  // letters like "A+" / "B+" always fit inside their oval — it never
+  // relies on a fixed guessed width. The raw marks/total score column has
+  // been removed so nothing sits crowded next to the grade letters.
+  const tableRight = W - 80;
+  const pillRightX = tableRight - 10;   // right edge grade pills align to
+  const crX = pillRightX - 150;         // credits column center
+  const maxNameW = crX - 150;           // course name column width (from x=100)
+
+  ctx.strokeStyle = lineColor;
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(80, nextY); ctx.lineTo(W - 80, nextY); ctx.stroke();
   nextY += 30;
 
   // Table header
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillStyle = textMuted;
   ctx.font = '500 24px "IBM Plex Mono", monospace';
   ctx.textAlign = 'left';
   ctx.fillText('COURSE', 100, nextY);
   ctx.textAlign = 'center';
-  ctx.fillText('CR', W - 290, nextY);
-  ctx.fillText('TOTAL', W - 190, nextY);
-  ctx.fillText('GR', W - 100, nextY);
+  ctx.fillText('CR', crX, nextY);
+  ctx.fillText('GRADE', pillRightX - 55, nextY);
   nextY += 16;
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.strokeStyle = lineColor;
   ctx.beginPath(); ctx.moveTo(80, nextY); ctx.lineTo(W - 80, nextY); ctx.stroke();
   nextY += 28;
 
@@ -585,48 +655,49 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts) {
   courseRows.forEach((row, i) => {
     const even = i % 2 === 0;
     if (even) {
-      ctx.fillStyle = 'rgba(255,255,255,0.025)';
+      ctx.fillStyle = rowStripe;
       ctx.fillRect(80, nextY - 20, W - 160, rowH);
     }
 
     // Course name — truncate if needed
-    const maxNameW = W - 160 - 280;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillStyle = textPrimary;
     ctx.font = `500 ${Math.min(28, rowH * 0.38)}px Inter, sans-serif`;
     ctx.textAlign = 'left';
     const truncName = truncateText(ctx, row.name, maxNameW);
     ctx.fillText(truncName, 100, nextY + rowH * 0.42);
 
     // Credits
-    ctx.fillStyle = 'rgba(255,255,255,0.40)';
+    ctx.fillStyle = textSecondary;
     ctx.font = `500 ${Math.min(26, rowH * 0.35)}px "IBM Plex Mono", monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(row.credits, W - 290, nextY + rowH * 0.42);
+    ctx.fillText(row.credits, crX, nextY + rowH * 0.42);
 
-    // Total
-    ctx.fillStyle = row.grade.color;
-    ctx.font = `600 ${Math.min(26, rowH * 0.35)}px "IBM Plex Mono", monospace`;
-    ctx.fillText(row.total.toFixed(1), W - 190, nextY + rowH * 0.42);
+    // Grade pill — width measured from the letter itself, so it always
+    // fully contains the text no matter how wide the glyphs render.
+    const gpH = Math.min(40, rowH * 0.5);
+    const letterFont = Math.min(24, rowH * 0.32);
+    ctx.font = `700 ${letterFont}px "IBM Plex Mono", monospace`;
+    const letterW = ctx.measureText(row.grade.letter).width;
+    const gpW = Math.max(gpH * 1.6, letterW + 34);
+    const gpX = pillRightX - gpW;
+    const gpY = nextY + (rowH - gpH) / 2 - 4;
 
-    // Grade pill
-    const gpW = 80, gpH = Math.min(40, rowH * 0.5);
     ctx.fillStyle = row.grade.color + '28';
-    roundRect(ctx, W - 148, nextY + (rowH - gpH) / 2 - 4, gpW, gpH, gpH / 2);
+    roundRect(ctx, gpX, gpY, gpW, gpH, gpH / 2);
     ctx.fill();
     ctx.strokeStyle = row.grade.color + '60';
     ctx.lineWidth = 1.5;
-    roundRect(ctx, W - 148, nextY + (rowH - gpH) / 2 - 4, gpW, gpH, gpH / 2);
+    roundRect(ctx, gpX, gpY, gpW, gpH, gpH / 2);
     ctx.stroke();
+
     ctx.fillStyle = row.grade.color;
-    ctx.font = `700 ${Math.min(24, rowH * 0.32)}px "IBM Plex Mono", monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(row.grade.letter, W - 108, nextY + rowH * 0.44);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(row.grade.letter, gpX + gpW / 2, gpY + gpH / 2 + 1);
+    ctx.textBaseline = 'alphabetic';
 
     nextY += rowH;
   });
-
-  // Show modal
-  document.getElementById('share-modal').style.display = 'block';
 }
 
 function closeShareModal() {
@@ -884,8 +955,9 @@ function updateSem1UI() {
 
 // ─── GRADE HELPERS ──────────────────────────────────
 // Colors are read live from CSS variables so they follow the active
-// theme automatically. shareCard() temporarily forces dark theme so the
-// exported image always keeps its fixed dark, branded look.
+// theme automatically. renderShareCard() temporarily forces whichever
+// light/dark mode is selected for the share card, independent of the
+// live site's own theme.
 const GRADES = [
   { letter: 'O',  pts: 10, min: 90, var: '--gold'  },
   { letter: 'A+', pts: 9,  min: 80, var: '--green' },
