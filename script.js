@@ -654,23 +654,31 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts, cardTheme) {
 
   courseRows.forEach((row, i) => {
     const even = i % 2 === 0;
+    const rowTop = nextY - 20;
     if (even) {
       ctx.fillStyle = rowStripe;
-      ctx.fillRect(80, nextY - 20, W - 160, rowH);
+      ctx.fillRect(80, rowTop, W - 160, rowH);
     }
+
+    // Single vertical center for this row — course name, credit number,
+    // and the grade pill all anchor to this exact line (via textBaseline
+    // 'middle') so they stay level with each other instead of each using
+    // a different offset guess.
+    const rowCenterY = rowTop + rowH / 2;
+    ctx.textBaseline = 'middle';
 
     // Course name — truncate if needed
     ctx.fillStyle = textPrimary;
     ctx.font = `500 ${Math.min(28, rowH * 0.38)}px Inter, sans-serif`;
     ctx.textAlign = 'left';
     const truncName = truncateText(ctx, row.name, maxNameW);
-    ctx.fillText(truncName, 100, nextY + rowH * 0.42);
+    ctx.fillText(truncName, 100, rowCenterY);
 
     // Credits
     ctx.fillStyle = textSecondary;
     ctx.font = `500 ${Math.min(26, rowH * 0.35)}px "IBM Plex Mono", monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(row.credits, crX, nextY + rowH * 0.42);
+    ctx.fillText(row.credits, crX, rowCenterY);
 
     // Grade pill — width measured from the letter itself, so it always
     // fully contains the text no matter how wide the glyphs render.
@@ -680,7 +688,7 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts, cardTheme) {
     const letterW = ctx.measureText(row.grade.letter).width;
     const gpW = Math.max(gpH * 1.6, letterW + 34);
     const gpX = pillRightX - gpW;
-    const gpY = nextY + (rowH - gpH) / 2 - 4;
+    const gpY = rowCenterY - gpH / 2;
 
     ctx.fillStyle = row.grade.color + '28';
     roundRect(ctx, gpX, gpY, gpW, gpH, gpH / 2);
@@ -692,10 +700,9 @@ function shareCardDraw(halvedGlobal, prevCr, prevPts, cardTheme) {
 
     ctx.fillStyle = row.grade.color;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(row.grade.letter, gpX + gpW / 2, gpY + gpH / 2 + 1);
-    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(row.grade.letter, gpX + gpW / 2, rowCenterY);
 
+    ctx.textBaseline = 'alphabetic';
     nextY += rowH;
   });
 }
