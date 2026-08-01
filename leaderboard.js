@@ -289,6 +289,7 @@ function lbRenderProfileForm() {
         </div>
       </div>
       ${hasUniEmail ? `<div class="success-box" style="margin-bottom:16px;">✓ Signed in with your university email (${escapeHtml(_lbSession.user.email)})</div>` : ''}
+      <div id="lb-profile-error"></div>
       <button class="btn" style="width:100%;" onclick="lbCreateProfile(${hasUniEmail})">Continue</button>
     </div>
   `);
@@ -316,6 +317,9 @@ async function lbCreateProfile(hasUniEmail) {
   const admission_year = parseInt(document.getElementById('lb-admyear').value, 10);
   const program_duration_years = parseInt(document.getElementById('lb-duration').value, 10);
 
+  const errorSlot = document.getElementById('lb-profile-error');
+  if (errorSlot) errorSlot.innerHTML = '';
+
   if (!display_name || !last_initial || !roll_number || !department || !degree_type || !admission_year) {
     showToast('Please fill in every field');
     return;
@@ -329,6 +333,15 @@ async function lbCreateProfile(hasUniEmail) {
   });
 
   if (error) {
+    // 23505 = unique_violation. This blocks people BEFORE they ever reach
+    // the transcript upload screen, so a toast that fades in a couple
+    // seconds is easy to miss and easy to mistake for "upload is broken"
+    // rather than what it actually is — shown inline and left up so it
+    // can't be missed.
+    const msg = error.code === '23505'
+      ? `That roll number is already registered to a profile. If it's yours from an earlier attempt (e.g. testing under a different Google account), delete the old one first — this can't create a second profile for the same roll number.`
+      : 'Could not save: ' + error.message;
+    if (errorSlot) errorSlot.innerHTML = `<div class="warn-box" style="margin-bottom:16px;">${escapeHtml(msg)}</div>`;
     showToast(error.code === '23505' ? 'That roll number is already registered' : 'Could not save: ' + error.message);
     return;
   }
