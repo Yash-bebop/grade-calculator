@@ -235,6 +235,22 @@ function lbSignOut() {
   _lbClient.auth.signOut();
 }
 
+// Shown on any screen before you've got a verified result — i.e. before
+// there's a "Sign out" button anywhere else in the flow. Google's account
+// chooser can silently pick the wrong saved account (shared devices, a
+// sibling's account still logged in, etc.), and without this there was no
+// way back except leaving the app and fighting with Google's own account
+// switcher. Cheap enough to just always show pre-verification.
+function lbAccountStrip() {
+  const email = _lbSession?.user?.email || '';
+  return `
+    <div class="helper" style="margin-bottom:14px;text-align:right;">
+      Signed in as ${escapeHtml(email)} —
+      <a href="#" onclick="lbSignOut();return false;">not you? sign out</a>
+    </div>
+  `;
+}
+
 // ─── VIEW: CREATE PROFILE ───────────────────────────────────────────
 function lbParseRoll(rollNumber) {
   const m = /^(\d{2})([a-zA-Z]+)(\d+)$/.exec((rollNumber || '').trim());
@@ -247,6 +263,7 @@ function lbRenderProfileForm() {
   const hasUniEmail = emailDomain.toLowerCase() === 'doonuniversity.ac.in';
 
   lbRender(`
+    ${lbAccountStrip()}
     <div class="info-box" style="margin-bottom:16px;">
       One-time setup. Your roll number isn't shown publicly — it's only used to cross-check against your transcript at verification time, and to stop one person creating multiple profiles.
     </div>
@@ -356,6 +373,7 @@ async function lbCreateProfile(hasUniEmail) {
 function lbRenderVerificationFlow(pending, suggestedSemester) {
   if (pending && pending.status === 'pending') {
     lbRender(`
+      ${lbAccountStrip()}
       <div class="card" style="text-align:center;padding:32px 20px;">
         <div style="font-size:32px;margin-bottom:10px;">⏳</div>
         <div style="font-weight:700;margin-bottom:6px;">Semester ${pending.semester_number} — under review</div>
@@ -376,6 +394,7 @@ function lbRenderVerificationFlow(pending, suggestedSemester) {
     .join('');
 
   lbRender(`
+    ${lbAccountStrip()}
     ${rejectedNotice}
     <div class="info-box" style="margin-bottom:16px;">
       Upload a photo or PDF of your official transcript/marksheet. This gets reviewed manually — once approved you'll get a verified badge and can join the leaderboard. The file is deleted right after review either way.
