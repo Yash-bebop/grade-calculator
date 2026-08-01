@@ -21,6 +21,19 @@
 //                          point — the user's own input is never trusted
 //                          for what actually gets written.
 //   - "reject"          -> { request_id, rejection_reason }
+//   - "list_verified"   -> { semester_number? } — already-approved rows from
+//                          semester_results, optionally filtered to one
+//                          semester. This is the audit view: it's how an
+//                          admin cross-checks what's actually feeding the
+//                          per-semester leaderboard, since "approve" only
+//                          ever shows you one request at a time and never
+//                          lets you look back afterward.
+//   - "edit_result"     -> { result_id, sgpa, cgpa } — corrects a row that's
+//                          already in semester_results. Different from
+//                          "approve": there's no pending verification_request
+//                          involved, so this is the only path to fix a typo
+//                          (admin's or student's) without making the student
+//                          re-upload their transcript from scratch.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -148,6 +161,46 @@ Deno.serve(async (req) => {
         .eq("id", request_id);
 
       await admin.storage.from("transcripts").remove([reqRow.transcript_storage_path]);
+
+      return json({ ok: true });
+    }
+
+    if (action === "list_verified") {
+      const { semester_number } = body;
+      let query = admin
+        .from("semester_results")
+        .select(`
+          id, profile_id, semester_number, sgpa, cgpa, verified_at, verified_by,
+          profiles ( display_name, last_initial, roll_number, department, admission_year )
+        `);
+      if (semester_number != null) query = query.eq("semester_number", semester_number);
+      const { data, error } = await query
+        .order("semester_number", { ascending: true })
+        .order("cgpa", { ascending: false });
+      if (error) return json({ error: error.message }, 500);
+      return json({ results: data });
+    }
+
+    if (action === "edit_result") {
+      const { result_id, sgpa, cgpa } = body;
+      if (!result_id || sgpa == null || cgpa == null) {
+        return json({ error: "result_id, sgpa, and cgpa are all required" }, 400);
+      }
+
+      // Confirms the row exists before writing — an update to a
+      // nonexistent id would otherwise silently affect zero rows.
+      const { data: existing, error: findErr } = await admin
+        .from("semester_results")
+        .select("id")
+        .eq("id", result_id)
+        .single();
+      if (findErr || !existing) return json({ error: "Result not found" }, 404);
+
+      const { error: updateErr } = await admin
+        .from("semester_results")
+        .update({ sgpa, cgpa, verified_at: new Date().toISOString(), verified_by: userData.user.id })
+        .eq("id", result_id);
+      if (updateErr) return json({ error: updateErr.message }, 500);
 
       return json({ ok: true });
     }

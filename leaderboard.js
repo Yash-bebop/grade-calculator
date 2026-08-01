@@ -589,7 +589,7 @@ async function lbRenderLeaderboard() {
 
     <div class="sec-head" style="margin-top:20px;">Rankings</div>
     <div class="flex-gap" style="margin-bottom:10px;">
-      <button class="btn ${_lbScope === 'batch' ? '' : 'sec'} sm" onclick="lbSetScope('batch')">My batch (${_lbProfile.department} '${String(_lbProfile.admission_year).slice(-2)})</button>
+      <button class="btn ${_lbScope === 'batch' ? '' : 'sec'} sm" onclick="lbSetScope('batch')">My batch (${_lbProfile.department} '${String(_lbProfile.admission_year + _lbProfile.program_duration_years).slice(-2)})</button>
       <button class="btn ${_lbScope === 'department' ? '' : 'sec'} sm" onclick="lbSetScope('department')">${escapeHtml(_lbProfile.department)}, all years</button>
       <button class="btn ${_lbScope === 'university' ? '' : 'sec'} sm" onclick="lbSetScope('university')">University-wide</button>
     </div>
