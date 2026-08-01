@@ -859,6 +859,22 @@ function showTab(id, btn) {
   document.getElementById('tab-' + id).classList.add('active');
   document.querySelectorAll('[data-tab="' + id + '"]').forEach(el => el.classList.add('active'));
   closeMobileMenu();
+
+  // Leaderboard is an opt-in, separate feature — its code (and the
+  // Supabase SDK) only ever gets fetched if someone opens this tab.
+  if (id === 'leaderboard') lbBootstrap();
+}
+
+// Loads leaderboard.js on first visit to the tab, then hands off to it.
+let _lbScriptLoaded = false;
+function lbBootstrap() {
+  if (_lbScriptLoaded) { if (typeof initLeaderboardTab === 'function') initLeaderboardTab(); return; }
+  _lbScriptLoaded = true;
+  const s = document.createElement('script');
+  s.src = 'leaderboard.js';
+  s.onload = () => { if (typeof initLeaderboardTab === 'function') initLeaderboardTab(); };
+  s.onerror = () => showToast('Could not load the leaderboard — check your connection');
+  document.body.appendChild(s);
 }
 
 // ─── MOBILE HAMBURGER MENU ──────────────────────────

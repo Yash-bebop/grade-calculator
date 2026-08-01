@@ -33,6 +33,10 @@
     <span class="tab-icon">📋</span>
     <span class="tab-label">Grade Reference</span>
   </button>
+  <button class="tab-btn" data-tab="leaderboard" onclick="showTab('leaderboard', this)">
+    <span class="tab-icon">🏆</span>
+    <span class="tab-label">Leaderboard</span>
+  </button>
 
   <!-- Mobile-only: hamburger replaces the 3 tabs below 768px so there's
        nothing to discover by sliding — tap it, a panel of all 3 pages appears. -->
@@ -52,6 +56,9 @@
   </button>
   <button class="menu-item" data-tab="ref" onclick="showTab('ref', this)" role="menuitem">
     <span class="tab-icon">📋</span><span>Grade Reference</span>
+  </button>
+  <button class="menu-item" data-tab="leaderboard" onclick="showTab('leaderboard', this)" role="menuitem">
+    <span class="tab-icon">🏆</span><span>Leaderboard</span>
   </button>
 </div>
 
@@ -296,6 +303,16 @@
       • Grade improvement: only for C or D, after program completion, within 1 year.
     </div>
   </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB 4 · LEADERBOARD (opt-in — separate from the calculator)
+     Content is rendered entirely by leaderboard.js, which is fetched
+     lazily the first time this tab opens. Nothing here talks to any
+     server until a person actively opens this tab.
+══════════════════════════════════════════════════ -->
+<div class="panel" id="tab-leaderboard">
+  <div class="card empty-state"><div class="empty-title">Open this tab to load the leaderboard</div></div>
 </div>
 </div><!-- /main-content -->
 
