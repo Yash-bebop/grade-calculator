@@ -63,7 +63,17 @@ async function initLeaderboardTab() {
   _lbClient = window.supabase.createClient(LB_SUPABASE_URL, LB_SUPABASE_ANON_KEY);
 
   _lbClient.auth.onAuthStateChange((_event, session) => {
+    // Supabase re-validates the session (and fires this callback, usually
+    // as a same-user SIGNED_IN) every time the tab's visibilityState goes
+    // hidden -> visible again — which includes the moment the native file
+    // picker closes after choosing a file. Without this guard, that fired
+    // a full re-render of the verification form on every file selection,
+    // wiping the chosen file (and typed CGPA/SGPA) before "Submit for
+    // verification" could be clicked. Only actually refresh the view on a
+    // REAL auth change (sign-in/out) — not a same-user session touch-up.
+    const sameUser = _lbSession?.user?.id === session?.user?.id;
     _lbSession = session;
+    if (sameUser) return;
     lbRefresh();
   });
 
@@ -339,8 +349,18 @@ async function lbSubmitTranscript() {
   const claimed_cgpa = parseFloat(document.getElementById('lb-claimed-cgpa').value) || null;
   const claimed_sgpa = parseFloat(document.getElementById('lb-claimed-sgpa').value) || null;
 
+  // Mobile browsers (Android especially, when the file comes from a
+  // gallery/content picker rather than local storage) sometimes hand back
+  // a File with an empty `.type`. Supabase stores whatever content-type
+  // the browser sends, so an empty type gets saved as a generic
+  // application/octet-stream object — which is why it can silently fail
+  // to render as an image in the Storage dashboard even though the bytes
+  // are fine. Force a real one before uploading.
+  const contentType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+  const fileToUpload = file.type ? file : new File([file], file.name, { type: contentType });
+
   const path = `${_lbSession.user.id}/${Date.now()}-${file.name}`;
-  const { error: uploadErr } = await _lbClient.storage.from('transcripts').upload(path, file);
+  const { error: uploadErr } = await _lbClient.storage.from('transcripts').upload(path, fileToUpload, { contentType });
   if (uploadErr) { showToast('Upload failed: ' + uploadErr.message); return; }
 
   const { error: reqErr } = await _lbClient.from('verification_requests').insert({
