@@ -258,10 +258,15 @@ function onPrevFieldEdit() {
 }
 
 // ─── SEM SWITCHER UI ────────────────────────────────
+function isCalcTabActive() {
+  const panel = document.getElementById('tab-calc');
+  return !!(panel && panel.classList.contains('active'));
+}
+
 function renderSemSwitcher() {
   const bar = document.getElementById('sem-switcher-bar');
   if (!bar) return;
-  if (!activeSem) { bar.style.display = 'none'; return; }
+  if (!activeSem || !isCalcTabActive()) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
   const meta = getMetaState();
   const used = meta.semsUsed || [];
@@ -860,6 +865,11 @@ function showTab(id, btn) {
   document.querySelectorAll('[data-tab="' + id + '"]').forEach(el => el.classList.add('active'));
   closeMobileMenu();
 
+  // The overhead semester strip + pills are calculator-specific chrome —
+  // hide them the instant we leave that tab, and let renderSemSwitcher
+  // decide whether to bring them back (it also checks isCalcTabActive).
+  if (typeof renderSemSwitcher === 'function') renderSemSwitcher();
+
   // Leaderboard is an opt-in, separate feature — its code (and the
   // Supabase SDK) only ever gets fetched if someone opens this tab.
   if (id === 'leaderboard') lbBootstrap();
@@ -1068,10 +1078,9 @@ function renderCourses() {
       <div class="card empty-state">
         <div class="empty-icon">📚</div>
         <div class="empty-title">No courses added yet</div>
-        <div class="empty-sub">Add your subjects or load demo data<br>to start calculating your SGPA.</div>
+        <div class="empty-sub">Add your subjects to start calculating your SGPA.</div>
         <div class="empty-actions">
           <button class="btn" onclick="addCourse()">+ Add Course</button>
-          <button class="btn sec" onclick="loadDemo()">Load Demo Data</button>
         </div>
       </div>`;
     updateHero();
@@ -1559,24 +1568,6 @@ function recalcAll() {
   debouncedSave();
 }
 
-// Fix #4: renamed loadYashSem2 → loadDemo, clarified it's sample data
-function loadDemo() {
-  courses = [];
-  courseIdCounter = 0;
-  // Demo uses Sem 2 CSE course names — marks are illustrative, not any real person's data
-  const data = [
-    { name: 'Computer Architecture',      credits: 4, internal: 15, internalMax: 20, midsem: 20,   midsemMax: 30, midsemType: 'auto',    teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 48 },
-    { name: 'Discrete Mathematics',        credits: 4, internal: 16, internalMax: 20, midsem: 22,   midsemMax: 30, midsemType: 'auto',    teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 52 },
-    { name: 'Fundamentals of Electronics', credits: 4, internal: 14, internalMax: 20, midsem: 18,   midsemMax: 30, midsemType: 'auto',    teacherAward: 25, teacherAwardMax: 30, endsemMax: 50, endsemScore: 35 },
-    { name: 'Optimisation Techniques',     credits: 3, internal: 17, internalMax: 20, midsem: 0,    midsemMax: 30, midsemType: 'teacher', teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 50 },
-    { name: 'Communicative English',        credits: 2, internal: 18, internalMax: 20, midsem: 0,    midsemMax: 30, midsemType: 'teacher', teacherAward: 25, teacherAwardMax: 30, endsemMax: 70, endsemScore: 55 },
-  ];
-  data.forEach(d => { d.id = ++courseIdCounter; courses.push(d); });
-  document.getElementById('prev-credits').value = '';
-  document.getElementById('prev-points').value  = '';
-  renderCourses();
-}
-
 // ─── CGPA PLANNER ───────────────────────────────────
 function addPastSem(preset) {
   const id = ++pastSemIdCounter;
@@ -1904,4 +1895,27 @@ function skipOnboarding() {
     document.getElementById('target-cgpa').value = '8.00';
     calcPlan();
   }
+})();
+
+// ─── RETURN-FROM-GOOGLE-SIGN-IN ROUTING ──────────────
+// lbSignIn() tags its redirectTo with ?lbreturn=1 specifically so that,
+// after the OAuth round trip reloads this page, we land back on the
+// Leaderboard tab (where the Supabase client actually lives) instead of
+// the calculator's default tab — otherwise leaderboard.js never even
+// loads, the returning session token sitting in the URL never gets
+// picked up, and sign-in looks like it silently failed.
+(function restoreLeaderboardTabAfterSignIn() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('lbreturn') !== '1') return;
+
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  showTab('leaderboard');
+
+  // Strip our own routing param but keep window.location.hash exactly as
+  // it is — that's where Supabase's #access_token=... lives, and
+  // leaderboard.js (loaded by showTab above) still needs to read it.
+  params.delete('lbreturn');
+  const newSearch = params.toString();
+  history.replaceState(null, '', window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash);
 })();

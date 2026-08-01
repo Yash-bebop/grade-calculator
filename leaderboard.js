@@ -20,6 +20,11 @@ const LB_SUPABASE_ANON_KEY = 'sb_publishable_SRWpwaUx6vkVekrUFO3vGQ_qY_YNKHc';
 const LB_ADMIN_EMAILS = ['inquireofyash@gmail.com'];
 const LB_EDGE_FN_URL = LB_SUPABASE_URL + '/functions/v1/review-verification';
 const LB_MAX_SEMESTERS = 8;
+// The admin review dashboard (admin.js) is NOT part of this repo — it's
+// uploaded straight to this public, read-only Storage bucket and fetched
+// at runtime, only for the signed-in admin. See admin/README.md.
+const LB_ADMIN_ASSET_BUCKET = 'site-assets';
+const LB_ADMIN_ASSET_PATH = 'admin.js';
 
 let _lbClient = null;
 let _lbSession = null;
@@ -63,17 +68,7 @@ async function initLeaderboardTab() {
   _lbClient = window.supabase.createClient(LB_SUPABASE_URL, LB_SUPABASE_ANON_KEY);
 
   _lbClient.auth.onAuthStateChange((_event, session) => {
-    // Supabase re-validates the session (and fires this callback, usually
-    // as a same-user SIGNED_IN) every time the tab's visibilityState goes
-    // hidden -> visible again — which includes the moment the native file
-    // picker closes after choosing a file. Without this guard, that fired
-    // a full re-render of the verification form on every file selection,
-    // wiping the chosen file (and typed CGPA/SGPA) before "Submit for
-    // verification" could be clicked. Only actually refresh the view on a
-    // REAL auth change (sign-in/out) — not a same-user session touch-up.
-    const sameUser = _lbSession?.user?.id === session?.user?.id;
     _lbSession = session;
-    if (sameUser) return;
     lbRefresh();
   });
 
@@ -110,12 +105,48 @@ function lbNoteLiveUpdate() {
   if (el) el.textContent = 'updated ' + new Date().toLocaleTimeString();
 }
 
+// ─── ADMIN ROUTING ────────────────────────────────────────────────
+// Checked BEFORE any profile/verification logic — an admin has no use
+// for the student flow at all, so this must be the very first branch.
+function lbIsAdmin() {
+  return !!(_lbSession && LB_ADMIN_EMAILS.includes((_lbSession.user.email || '').toLowerCase()));
+}
+
+let _lbAdminModuleLoaded = false;
+function lbLoadAdminModule() {
+  return new Promise((resolve, reject) => {
+    if (_lbAdminModuleLoaded) return resolve();
+    const { data } = _lbClient.storage.from(LB_ADMIN_ASSET_BUCKET).getPublicUrl(LB_ADMIN_ASSET_PATH);
+    const s = document.createElement('script');
+    s.src = data.publicUrl + (data.publicUrl.includes('?') ? '&' : '?') + 'v=' + Date.now(); // always fetch latest, never cached
+    s.onload = () => { _lbAdminModuleLoaded = true; resolve(); };
+    s.onerror = () => reject(new Error('Admin module not found — has admin.js been uploaded to the site-assets bucket?'));
+    document.head.appendChild(s);
+  });
+}
+
 // ─── MAIN STATE ROUTER ──────────────────────────────────────────────
 async function lbRefresh() {
   _lbOnLeaderboardView = false;
 
   if (!_lbSession) {
     lbRenderSignedOut();
+    return;
+  }
+
+  if (lbIsAdmin()) {
+    lbRender(`<div class="card empty-state"><div class="empty-title">Loading admin dashboard…</div></div>`);
+    try {
+      await lbLoadAdminModule();
+    } catch (e) {
+      lbRender(`<div class="warn-box">${escapeHtml(e.message)}</div>`);
+      return;
+    }
+    if (typeof lbRenderAdminDashboard === 'function') {
+      lbRenderAdminDashboard();
+    } else {
+      lbRender(`<div class="warn-box">Admin module loaded but didn't register correctly.</div>`);
+    }
     return;
   }
 
@@ -165,37 +196,43 @@ function lbRenderSignedOut() {
     </div>
     <div class="card" style="text-align:center;padding:32px 20px;">
       <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;">Sign in to continue</div>
-      <button class="btn" onclick="lbSignIn()">Sign in with Google</button>
+      <button class="btn" id="lb-signin-btn" onclick="lbSignIn()">Sign in with Google</button>
       <div class="helper" style="margin-top:14px;">Any Google account works — a university email isn't required. Verification happens separately, by uploading your transcript.</div>
     </div>
   `);
 }
 
+// Guarded against double-clicks: firing signInWithOAuth twice in quick
+// succession starts two competing OAuth flows, and the second overwrites
+// the first's stored state — so the first one comes back as an
+// "OAuth state not found or expired" error. One click, then disable.
+// redirectTo is built fresh (not window.location.href) so a stale
+// #access_token= or ?error= fragment from a previous attempt never gets
+// carried into the next one. ?lbreturn=1 tells the app to reopen this
+// tab (instead of the calculator) once the redirect lands — a hash
+// fragment can't be used for that signal since Supabase appends its own
+// #access_token=... hash on the way back, and two #fragments on one URL
+// is exactly the malformed-URL bug this replaced.
+let _lbSigningIn = false;
 function lbSignIn() {
+  if (_lbSigningIn) return;
+  _lbSigningIn = true;
+  const btn = document.getElementById('lb-signin-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Redirecting…'; }
+
+  const cleanUrl = window.location.origin + window.location.pathname + '?lbreturn=1';
   _lbClient.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href },
+    options: { redirectTo: cleanUrl },
+  }).catch((e) => {
+    _lbSigningIn = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign in with Google'; }
+    showToast('Sign-in failed to start: ' + e.message);
   });
 }
 
 function lbSignOut() {
   _lbClient.auth.signOut();
-}
-
-// Shown on any screen before you've got a verified result — i.e. before
-// there's a "Sign out" button anywhere else in the flow. Google's account
-// chooser can silently pick the wrong saved account (shared devices, a
-// sibling's account still logged in, etc.), and without this there was no
-// way back except leaving the app and fighting with Google's own account
-// switcher. Cheap enough to just always show pre-verification.
-function lbAccountStrip() {
-  const email = _lbSession?.user?.email || '';
-  return `
-    <div class="helper" style="margin-bottom:14px;text-align:right;">
-      Signed in as ${escapeHtml(email)} —
-      <a href="#" onclick="lbSignOut();return false;">not you? sign out</a>
-    </div>
-  `;
 }
 
 // ─── VIEW: CREATE PROFILE ───────────────────────────────────────────
@@ -210,7 +247,6 @@ function lbRenderProfileForm() {
   const hasUniEmail = emailDomain.toLowerCase() === 'doonuniversity.ac.in';
 
   lbRender(`
-    ${lbAccountStrip()}
     <div class="info-box" style="margin-bottom:16px;">
       One-time setup. Your roll number isn't shown publicly — it's only used to cross-check against your transcript at verification time, and to stop one person creating multiple profiles.
     </div>
@@ -307,7 +343,6 @@ async function lbCreateProfile(hasUniEmail) {
 function lbRenderVerificationFlow(pending, suggestedSemester) {
   if (pending && pending.status === 'pending') {
     lbRender(`
-      ${lbAccountStrip()}
       <div class="card" style="text-align:center;padding:32px 20px;">
         <div style="font-size:32px;margin-bottom:10px;">⏳</div>
         <div style="font-weight:700;margin-bottom:6px;">Semester ${pending.semester_number} — under review</div>
@@ -328,7 +363,6 @@ function lbRenderVerificationFlow(pending, suggestedSemester) {
     .join('');
 
   lbRender(`
-    ${lbAccountStrip()}
     ${rejectedNotice}
     <div class="info-box" style="margin-bottom:16px;">
       Upload a photo or PDF of your official transcript/marksheet. This gets reviewed manually — once approved you'll get a verified badge and can join the leaderboard. The file is deleted right after review either way.
@@ -368,18 +402,8 @@ async function lbSubmitTranscript() {
   const claimed_cgpa = parseFloat(document.getElementById('lb-claimed-cgpa').value) || null;
   const claimed_sgpa = parseFloat(document.getElementById('lb-claimed-sgpa').value) || null;
 
-  // Mobile browsers (Android especially, when the file comes from a
-  // gallery/content picker rather than local storage) sometimes hand back
-  // a File with an empty `.type`. Supabase stores whatever content-type
-  // the browser sends, so an empty type gets saved as a generic
-  // application/octet-stream object — which is why it can silently fail
-  // to render as an image in the Storage dashboard even though the bytes
-  // are fine. Force a real one before uploading.
-  const contentType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-  const fileToUpload = file.type ? file : new File([file], file.name, { type: contentType });
-
   const path = `${_lbSession.user.id}/${Date.now()}-${file.name}`;
-  const { error: uploadErr } = await _lbClient.storage.from('transcripts').upload(path, fileToUpload, { contentType });
+  const { error: uploadErr } = await _lbClient.storage.from('transcripts').upload(path, file);
   if (uploadErr) { showToast('Upload failed: ' + uploadErr.message); return; }
 
   const { error: reqErr } = await _lbClient.from('verification_requests').insert({
@@ -529,13 +553,7 @@ async function lbRenderLeaderboard() {
       </table>
     </div>
     <div class="helper" style="text-align:right;margin-top:6px;">🟢 Live — <span id="lb-live-ts">updates automatically</span></div>
-
-    ${LB_ADMIN_EMAILS.includes((_lbSession.user.email || '').toLowerCase()) ? '<div id="lb-admin-panel"></div>' : ''}
   `);
-
-  if (LB_ADMIN_EMAILS.includes((_lbSession.user.email || '').toLowerCase())) {
-    lbRenderAdminPanel();
-  }
 }
 
 function lbSetScope(scope) {
@@ -701,78 +719,7 @@ async function lbSaveSettings() {
 }
 
 // ─── ADMIN REVIEW PANEL ──────────────────────────────────────────────
-async function lbCallEdgeFunction(payload) {
-  const res = await fetch(LB_EDGE_FN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + _lbSession.access_token,
-    },
-    body: JSON.stringify(payload),
-  });
-  return res.json();
-}
-
-async function lbRenderAdminPanel() {
-  const panel = document.getElementById('lb-admin-panel');
-  if (!panel) return;
-  panel.innerHTML = `<div class="sec-head" style="margin-top:24px;">Review Queue (admin)</div><div class="card"><div class="helper">Loading…</div></div>`;
-
-  const result = await lbCallEdgeFunction({ action: 'list_pending' });
-  if (result.error) {
-    panel.innerHTML = `<div class="sec-head" style="margin-top:24px;">Review Queue (admin)</div><div class="warn-box">${escapeHtml(result.error)}</div>`;
-    return;
-  }
-
-  const requests = result.requests || [];
-  if (requests.length === 0) {
-    panel.innerHTML = `<div class="sec-head" style="margin-top:24px;">Review Queue (admin)</div><div class="card empty-state"><div class="empty-sub">Nothing pending.</div></div>`;
-    return;
-  }
-
-  panel.innerHTML = `<div class="sec-head" style="margin-top:24px;">Review Queue (admin) — ${requests.length} pending</div>` +
-    requests.map(r => `
-      <div class="card" id="lb-req-${r.id}" style="margin-bottom:10px;">
-        <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(r.profiles.display_name)} — roll ${escapeHtml(r.profiles.roll_number)} — Semester ${r.semester_number}</div>
-        <div class="helper" style="margin-bottom:10px;">
-          ${escapeHtml(r.profiles.department)} · admitted ${r.profiles.admission_year} ·
-          ${r.profiles.has_university_email ? 'has university email' : 'no university email'} ·
-          claimed CGPA: ${r.claimed_cgpa ?? '—'} · claimed SGPA: ${r.claimed_sgpa ?? '—'}
-        </div>
-        <button class="btn sec sm" onclick="lbViewTranscript('${r.id}')" style="margin-bottom:10px;">📄 View transcript</button>
-        <div class="helper" style="margin-bottom:4px;">Both fields below are required — read them off the document, not from the claimed values above.</div>
-        <div class="lb-2col" style="margin-bottom:10px;">
-          <input type="number" id="lb-sgpa-${r.id}" step="0.01" min="0" max="10" placeholder="Sem ${r.semester_number} SGPA (document)">
-          <input type="number" id="lb-cgpa-${r.id}" step="0.01" min="0" max="10" placeholder="Cumulative CGPA (document)">
-        </div>
-        <div class="flex-gap">
-          <button class="btn sm" onclick="lbApprove('${r.id}')">✓ Approve</button>
-          <button class="btn sec sm danger" onclick="lbReject('${r.id}')">✕ Reject</button>
-        </div>
-      </div>
-    `).join('');
-}
-
-async function lbViewTranscript(requestId) {
-  const result = await lbCallEdgeFunction({ action: 'get_review_url', request_id: requestId });
-  if (result.error) { showToast(result.error); return; }
-  window.open(result.url, '_blank');
-}
-
-async function lbApprove(requestId) {
-  const sgpa = parseFloat(document.getElementById('lb-sgpa-' + requestId).value);
-  const cgpa = parseFloat(document.getElementById('lb-cgpa-' + requestId).value);
-  if (!sgpa || !cgpa) { showToast('Enter both SGPA and CGPA as shown on the document first'); return; }
-  const result = await lbCallEdgeFunction({ action: 'approve', request_id: requestId, sgpa, cgpa });
-  if (result.error) { showToast(result.error); return; }
-  showToast('✓ Approved', 'success');
-  lbRenderAdminPanel();
-}
-
-async function lbReject(requestId) {
-  const reason = prompt('Rejection reason (shown to the student):') || '';
-  const result = await lbCallEdgeFunction({ action: 'reject', request_id: requestId, rejection_reason: reason });
-  if (result.error) { showToast(result.error); return; }
-  showToast('Rejected', 'success');
-  lbRenderAdminPanel();
-}
+// Deliberately not here. The whole admin dashboard (review queue,
+// transcript preview, approve/reject) lives in admin.js, which is
+// gitignored and loaded dynamically — see lbLoadAdminModule() above and
+// admin/README.md for how it gets deployed.

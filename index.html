@@ -171,12 +171,11 @@
     </div>
     <div class="flex-gap" style="margin-top:4px;">
       <button class="btn" onclick="addCourse()">+ Add Course</button>
-      <button class="btn sec" onclick="loadDemo()" title="Load sample Semester 2 data (demo only)">Load Demo Data</button>
       <button class="btn sec sm danger" onclick="clearCourses()">Clear All</button>
     </div>
+    <button class="btn share-card-cta" onclick="shareCard()" title="Generate a shareable image card">🖼 Share Card</button>
     <div class="flex-gap" style="margin-top:8px;">
       <button class="btn sec sm" id="copy-summary-btn" onclick="copySummary()" title="Copy a plain-text summary to clipboard">📋 Copy Summary</button>
-      <button class="btn sec sm" onclick="shareCard()" title="Generate a shareable image card">🖼 Share Card</button>
       <button class="btn sec sm" onclick="exportData()" title="Download all your data as a JSON backup">⬇ Backup</button>
       <label class="btn sec sm" title="Restore from a previously downloaded backup" style="cursor:pointer;">⬆ Restore<input type="file" accept=".json" onchange="importData(this)" style="display:none;"></label>
     </div>

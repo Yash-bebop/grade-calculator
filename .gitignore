@@ -19,3 +19,10 @@ yarn-error.log*
 
 # Windows
 Thumbs.db
+
+# Admin-only review dashboard — deliberately NOT part of the public repo.
+# It's uploaded straight to Supabase Storage (bucket: site-assets) and
+# fetched at runtime only for the signed-in admin. See admin/README.md.
+admin.js
+admin/*.js
+!admin/README.md
