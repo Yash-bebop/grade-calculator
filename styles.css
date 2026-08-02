@@ -522,6 +522,32 @@ body {
   margin-top: 4px;
 }
 
+/* ── LEADERBOARD: PROFILE DETAIL MODAL ───────────── */
+.lb-name-link { cursor: pointer; }
+.lb-name-link:hover { text-decoration: underline; }
+.lb-profile-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow-y: auto;
+  padding: 24px 16px;
+  align-items: flex-start;
+  justify-content: center;
+}
+.lb-profile-modal-card {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+  margin: 40px auto;
+}
+
 /* ── CARDS ───────────────────────────────────────── */
 .card {
   background: var(--s2);

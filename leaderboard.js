@@ -20,6 +20,13 @@ const LB_SUPABASE_ANON_KEY = 'sb_publishable_SRWpwaUx6vkVekrUFO3vGQ_qY_YNKHc';
 const LB_ADMIN_EMAILS = ['inquireofyash@gmail.com'];
 const LB_EDGE_FN_URL = LB_SUPABASE_URL + '/functions/v1/review-verification';
 const LB_MAX_SEMESTERS = 8;
+
+// The 6 distinct degree names across every school at Doon, once you strip
+// subject/department (Physics, Economics, etc. all just become "B.Sc." /
+// "B.A.") and the Hons/with-Research suffix every program carries. That's
+// what keeps this a badge instead of a label — full names like "B.A.
+// (Hons/with Research) Economics" don't fit next to a name in a table row.
+const LB_DEGREE_TYPES = ['B.Tech', 'B.Sc.', 'B.A.', 'B.Com.', 'BBA', 'B.Des.'];
 // The admin review dashboard (admin.js) is NOT part of this repo — it's
 // uploaded straight to this public, read-only Storage bucket and fetched
 // at runtime, only for the signed-in admin. See admin/README.md.
@@ -299,7 +306,10 @@ function lbRenderProfileForm() {
         </div>
         <div>
           <div class="field-lbl" style="margin-bottom:5px;">Degree</div>
-          <input type="text" id="lb-degree" placeholder="e.g. B.Tech" style="width:100%;">
+          <select id="lb-degree" style="width:100%;">
+            <option value="" disabled selected>Select degree</option>
+            ${LB_DEGREE_TYPES.map(d => `<option value="${d}">${d}</option>`).join('')}
+          </select>
         </div>
       </div>
       <div class="lb-2col" style="margin-bottom:16px;">
@@ -523,7 +533,7 @@ async function lbRenderLeaderboard() {
     ? filtered.map((r, i) => `
         <tr ${r.profile_id === _lbSession.user.id ? 'style="background:rgba(232,255,71,0.06);"' : ''}>
           <td style="color:var(--muted);width:36px;">${i + 1}</td>
-          <td style="font-weight:600;">${escapeHtml(r.shown_name)}</td>
+          <td style="font-weight:600;" class="lb-name-link" onclick="lbOpenProfileDetail('${r.profile_id}')">${escapeHtml(r.shown_name)}</td>
           <td style="color:var(--muted2);text-transform:capitalize;">${escapeHtml(r.yearLabel)}</td>
           ${isOverall
             ? `<td style="font-weight:700;color:var(--acc4);">${Number(r.frozen_cgpa).toFixed(2)}</td>`
@@ -619,6 +629,93 @@ function lbSetSemesterView(view) {
   lbRenderLeaderboard();
 }
 
+// ─── PROFILE DETAIL (click a name on the leaderboard) ───────────────
+// No new RLS needed — semester_results_select_own_or_visible_to_verified
+// already lets any verified viewer read every row for a visible profile,
+// not just its latest one. This is just a frontend view onto access the
+// backend already grants; the leaderboard views just never queried it.
+// Degree is deliberately left out here too, same reasoning as the
+// leaderboard rows themselves.
+function lbOpenProfileDetail(profileId) {
+  let modal = document.getElementById('lb-profile-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lb-profile-modal';
+    modal.className = 'lb-profile-modal';
+    modal.onclick = (e) => { if (e.target === modal) lbCloseProfileDetail(); };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="lb-profile-modal-card"><div class="helper">Loading…</div></div>`;
+  modal.style.display = 'flex';
+  lbLoadProfileDetail(profileId, modal);
+}
+
+function lbCloseProfileDetail() {
+  const modal = document.getElementById('lb-profile-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') lbCloseProfileDetail();
+});
+
+async function lbLoadProfileDetail(profileId, modal) {
+  const cardEl = modal.querySelector('.lb-profile-modal-card');
+
+  const [{ data: profile, error: profErr }, { data: results, error: resErr }] = await Promise.all([
+    _lbClient.from('profiles')
+      .select('display_name, last_initial, full_name_opt_in, department, admission_year, program_duration_years, manual_year_override')
+      .eq('id', profileId).single(),
+    _lbClient.from('semester_results')
+      .select('semester_number, sgpa, cgpa, verified_at')
+      .eq('profile_id', profileId).order('semester_number', { ascending: true }),
+  ]);
+
+  if (profErr || resErr || !profile) {
+    cardEl.innerHTML = `
+      <div class="warn-box">Couldn't load this profile.</div>
+      <button class="btn sec sm" style="margin-top:10px;" onclick="lbCloseProfileDetail()">Close</button>`;
+    return;
+  }
+
+  const shownName = profile.full_name_opt_in ? profile.display_name : `${profile.display_name} ${profile.last_initial || ''}.`;
+  const yearLabel = lbYearLabel(profile.admission_year, profile.program_duration_years, profile.manual_year_override);
+  const rows = results || [];
+  const latest = rows[rows.length - 1];
+
+  const rowsHtml = rows.length
+    ? rows.map(r => `
+        <tr>
+          <td style="color:var(--muted2);">Sem ${r.semester_number}</td>
+          <td>${Number(r.sgpa).toFixed(2)}</td>
+          <td style="color:var(--muted2);">${Number(r.cgpa).toFixed(2)}</td>
+          <td style="color:var(--muted);font-size:11px;">${new Date(r.verified_at).toLocaleDateString()}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;">No verified semesters yet.</td></tr>`;
+
+  cardEl.innerHTML = `
+    <div class="flex-gap" style="justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+      <div>
+        <div style="font-weight:700;font-size:16px;">${escapeHtml(shownName)}</div>
+        <div class="helper" style="text-transform:capitalize;">${escapeHtml(profile.department)} · ${escapeHtml(yearLabel)}</div>
+      </div>
+      <button class="btn sec sm" onclick="lbCloseProfileDetail()">✕</button>
+    </div>
+    ${latest ? `
+      <div class="hero-stat" style="--accent-color: var(--acc4); margin-bottom:14px;">
+        <div class="lbl">Current CGPA</div>
+        <div class="val" style="color:var(--acc4)">${Number(latest.cgpa).toFixed(2)}</div>
+        <span class="div-badge">Semester ${latest.semester_number} · verified ${new Date(latest.verified_at).toLocaleDateString()}</span>
+      </div>` : ''}
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="thresh-table">
+        <thead><tr><th>Sem</th><th>SGPA</th><th>CGPA</th><th>Verified</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function lbGoAddSemester() {
   const latest = _lbMyResults[_lbMyResults.length - 1];
   const nextSem = Math.min((latest?.semester_number || 0) + 1, LB_MAX_SEMESTERS);
@@ -681,7 +778,10 @@ function lbRenderSettings() {
         </div>
         <div>
           <div class="field-lbl" style="margin-bottom:5px;">Degree</div>
-          <input type="text" id="lbs-degree" value="${escapeHtml(p.degree_type)}" style="width:100%;">
+          <select id="lbs-degree" style="width:100%;">
+            ${!LB_DEGREE_TYPES.includes(p.degree_type) ? `<option value="${escapeHtml(p.degree_type)}" selected>${escapeHtml(p.degree_type)}</option>` : ''}
+            ${LB_DEGREE_TYPES.map(d => `<option value="${d}" ${d === p.degree_type ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
         </div>
       </div>
       <div class="lb-2col" style="margin-bottom:12px;">
