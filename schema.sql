@@ -26,7 +26,7 @@
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null,
-  last_initial text not null,
+  last_name text not null,
   full_name_opt_in boolean not null default false,
   department text not null,
   degree_type text not null,
@@ -166,8 +166,8 @@ create or replace view public.semester_leaderboard
 with (security_invoker = true) as
 select
   p.id as profile_id,
-  case when p.full_name_opt_in then p.display_name
-       else p.display_name || ' ' || coalesce(p.last_initial || '.', '')
+  case when p.full_name_opt_in then p.display_name || ' ' || p.last_name
+       else p.display_name || ' ' || coalesce(substring(p.last_name from 1 for 1) || '.', '')
   end as shown_name,
   p.department, p.degree_type, p.admission_year, p.program_duration_years,
   p.manual_year_override,
@@ -182,8 +182,8 @@ create or replace view public.leaderboard
 with (security_invoker = true) as
 select distinct on (sr.profile_id)
   p.id as profile_id,
-  case when p.full_name_opt_in then p.display_name
-       else p.display_name || ' ' || coalesce(p.last_initial || '.', '')
+  case when p.full_name_opt_in then p.display_name || ' ' || p.last_name
+       else p.display_name || ' ' || coalesce(substring(p.last_name from 1 for 1) || '.', '')
   end as shown_name,
   p.department, p.degree_type, p.admission_year, p.program_duration_years,
   p.manual_year_override,

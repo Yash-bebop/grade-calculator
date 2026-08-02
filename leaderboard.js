@@ -27,6 +27,56 @@ const LB_MAX_SEMESTERS = 8;
 // what keeps this a badge instead of a label — full names like "B.A.
 // (Hons/with Research) Economics" don't fit next to a name in a table row.
 const LB_DEGREE_TYPES = ['B.Tech', 'B.Sc.', 'B.A.', 'B.Com.', 'BBA', 'B.Des.'];
+
+// Every subject/programme across Doon's schools, degree-type and Hons/
+// Research suffix stripped (that's what LB_DEGREE_TYPES is for) — this is
+// just the subject itself, grouped by school for the dropdown's <optgroup>.
+// Same free-text-inconsistency problem as degree_type: "CSE" vs "Computer
+// Science and Engineering" vs "cse" were three different departments to
+// the scope filter's exact-match check before this.
+const LB_DEPARTMENTS = [
+  { school: 'School of Design', name: 'Design' },
+  { school: 'School of Management', name: 'Commerce' },
+  { school: 'School of Management', name: 'Business Administration' },
+  { school: 'School of Languages', name: 'English' },
+  { school: 'School of Languages', name: 'Spanish' },
+  { school: 'School of Languages', name: 'German' },
+  { school: 'School of Languages', name: 'Chinese' },
+  { school: 'School of Languages', name: 'Japanese' },
+  { school: 'School of Languages', name: 'French' },
+  { school: 'School of Social Science', name: 'Psychology' },
+  { school: 'School of Social Science', name: 'Economics' },
+  { school: 'School of Physical Sciences', name: 'Physics' },
+  { school: 'School of Physical Sciences', name: 'Chemistry' },
+  { school: 'School of Physical Sciences', name: 'Mathematics' },
+  { school: 'School of Technology', name: 'Computer Science and Engineering' },
+  { school: 'School of Technology', name: 'Computer Science' },
+  { school: 'School of Biological Sciences', name: 'Biological Science' },
+  { school: 'School of Media & Communication Studies', name: 'Media & Communication Studies' },
+  { school: 'Nitya Nand Himalayan Research and Study Centre', name: 'Geology' },
+  { school: 'Nitya Nand Himalayan Research and Study Centre', name: 'Geography' },
+];
+
+function lbDepartmentOptionsHtml(selected) {
+  const schools = [...new Set(LB_DEPARTMENTS.map(d => d.school))];
+  return schools.map(school => `
+    <optgroup label="${escapeHtml(school)}">
+      ${LB_DEPARTMENTS.filter(d => d.school === school).map(d =>
+        `<option value="${escapeHtml(d.name)}" ${d.name === selected ? 'selected' : ''}>${escapeHtml(d.name)}</option>`
+      ).join('')}
+    </optgroup>`).join('');
+}
+
+// Best-effort only — I only have "ce" confirmed, from the roll-number
+// placeholder ("25ce85") already in this form before this change. Doon
+// doesn't publish an official branch-code table anywhere I can verify, so
+// this deliberately doesn't guess codes for the other ~18 departments.
+// Extend this object if you know the real scheme; until then, an
+// unrecognized code just prompts a self-check instead of asserting a
+// department it might get wrong.
+const LB_BRANCH_CODE_HINTS = {
+  ce: 'computer', cse: 'computer', cs: 'computer',
+};
 // The admin review dashboard (admin.js) is NOT part of this repo — it's
 // uploaded straight to this public, read-only Storage bucket and fetched
 // at runtime, only for the signed-in admin. See admin/README.md.
@@ -290,19 +340,23 @@ function lbRenderProfileForm() {
         <input type="text" id="lb-name" placeholder="e.g. Yashvardhan" style="width:100%;">
       </div>
       <div style="margin-bottom:12px;">
-        <div class="field-lbl" style="margin-bottom:5px;">Last initial</div>
-        <input type="text" id="lb-lastinitial" maxlength="1" placeholder="e.g. D" style="width:80px;">
+        <div class="field-lbl" style="margin-bottom:5px;">Last name</div>
+        <input type="text" id="lb-lastname" placeholder="e.g. Dobhal" style="width:100%;">
         <div class="helper">Shown as "Yashvardhan D." by default. You can opt up to your full name later from settings.</div>
       </div>
       <div style="margin-bottom:12px;">
         <div class="field-lbl" style="margin-bottom:5px;">Roll number</div>
         <input type="text" id="lb-roll" placeholder="e.g. 25ce85" style="width:100%;" oninput="lbOnRollInput()">
         <div class="helper" id="lb-roll-hint"></div>
+        <div class="helper" id="lb-dept-mismatch-warn" style="color:var(--warn, #d97706);"></div>
       </div>
       <div class="lb-2col" style="margin-bottom:12px;">
         <div>
           <div class="field-lbl" style="margin-bottom:5px;">Department</div>
-          <input type="text" id="lb-dept" placeholder="e.g. CSE" style="width:100%;">
+          <select id="lb-dept" style="width:100%;" onchange="lbCheckDeptMismatch()">
+            <option value="" disabled selected>Select department</option>
+            ${lbDepartmentOptionsHtml(null)}
+          </select>
         </div>
         <div>
           <div class="field-lbl" style="margin-bottom:5px;">Degree</div>
@@ -343,11 +397,37 @@ function lbOnRollInput() {
   } else {
     hint.textContent = '';
   }
+  lbCheckDeptMismatch();
+}
+
+// Soft, non-blocking nudge only — never prevents submission. See the
+// LB_BRANCH_CODE_HINTS comment above for why this doesn't assert a
+// specific department for most branch codes, just flags "go check this."
+function lbCheckDeptMismatch() {
+  const rollVal = document.getElementById('lb-roll')?.value;
+  const deptSelect = document.getElementById('lb-dept');
+  const warnEl = document.getElementById('lb-dept-mismatch-warn');
+  if (!warnEl) return;
+  if (!rollVal || !deptSelect || !deptSelect.value) { warnEl.textContent = ''; return; }
+
+  const parsed = lbParseRoll(rollVal);
+  if (!parsed) { warnEl.textContent = ''; return; }
+
+  const deptLabel = deptSelect.selectedOptions[0].textContent.toLowerCase();
+  const expectedKeyword = LB_BRANCH_CODE_HINTS[parsed.branchCode];
+
+  if (expectedKeyword) {
+    warnEl.textContent = deptLabel.includes(expectedKeyword)
+      ? ''
+      : `⚠ Roll number's branch code ("${parsed.branchCode}") doesn't look like it matches "${deptSelect.selectedOptions[0].textContent}" — worth double-checking?`;
+  } else {
+    warnEl.textContent = `Roll number suggests branch code "${parsed.branchCode}" — just make sure that matches the department you picked.`;
+  }
 }
 
 async function lbCreateProfile(hasUniEmail) {
   const display_name = document.getElementById('lb-name').value.trim();
-  const last_initial = document.getElementById('lb-lastinitial').value.trim().toUpperCase();
+  const last_name = document.getElementById('lb-lastname').value.trim();
   const roll_number = document.getElementById('lb-roll').value.trim().toLowerCase();
   const department = document.getElementById('lb-dept').value.trim();
   const degree_type = document.getElementById('lb-degree').value.trim();
@@ -357,14 +437,14 @@ async function lbCreateProfile(hasUniEmail) {
   const errorSlot = document.getElementById('lb-profile-error');
   if (errorSlot) errorSlot.innerHTML = '';
 
-  if (!display_name || !last_initial || !roll_number || !department || !degree_type || !admission_year) {
+  if (!display_name || !last_name || !roll_number || !department || !degree_type || !admission_year) {
     showToast('Please fill in every field');
     return;
   }
 
   const { error } = await _lbClient.from('profiles').insert({
     id: _lbSession.user.id,
-    display_name, last_initial, roll_number, department, degree_type,
+    display_name, last_name, roll_number, department, degree_type,
     admission_year, program_duration_years,
     has_university_email: hasUniEmail,
   });
@@ -664,7 +744,7 @@ async function lbLoadProfileDetail(profileId, modal) {
 
   const [{ data: profile, error: profErr }, { data: results, error: resErr }] = await Promise.all([
     _lbClient.from('profiles')
-      .select('display_name, last_initial, full_name_opt_in, department, admission_year, program_duration_years, manual_year_override')
+      .select('display_name, last_name, full_name_opt_in, department, admission_year, program_duration_years, manual_year_override')
       .eq('id', profileId).single(),
     _lbClient.from('semester_results')
       .select('semester_number, sgpa, cgpa, verified_at')
@@ -672,16 +752,35 @@ async function lbLoadProfileDetail(profileId, modal) {
   ]);
 
   if (profErr || resErr || !profile) {
+    // .single() errors (rather than returning null) when RLS filters the
+    // row out entirely — PGRST116 is PostgREST's "0 rows" code. That's the
+    // one case worth naming specifically: they didn't vanish, they just
+    // flipped visibility off since the leaderboard list was loaded.
+    const notVisible = profErr?.code === 'PGRST116';
     cardEl.innerHTML = `
-      <div class="warn-box">Couldn't load this profile.</div>
+      <div class="warn-box">${notVisible ? "This person isn't visible on the leaderboard anymore." : "Couldn't load this profile."}</div>
       <button class="btn sec sm" style="margin-top:10px;" onclick="lbCloseProfileDetail()">Close</button>`;
     return;
   }
 
-  const shownName = profile.full_name_opt_in ? profile.display_name : `${profile.display_name} ${profile.last_initial || ''}.`;
+  const shownName = profile.full_name_opt_in
+    ? `${profile.display_name} ${profile.last_name}`
+    : `${profile.display_name} ${(profile.last_name || '').charAt(0).toUpperCase()}.`;
   const yearLabel = lbYearLabel(profile.admission_year, profile.program_duration_years, profile.manual_year_override);
   const rows = results || [];
   const latest = rows[rows.length - 1];
+
+  // Comparison line — skipped for your own row (comparing yourself to
+  // yourself isn't useful) and whenever either side has no verified
+  // semester yet to compare against.
+  const isSelf = profileId === _lbSession.user.id;
+  const myLatest = _lbMyResults[_lbMyResults.length - 1];
+  let compareHtml = '';
+  if (!isSelf && latest && myLatest) {
+    const diff = myLatest.cgpa - latest.cgpa;
+    const diffLabel = Math.abs(diff) < 0.005 ? 'tied' : `${diff > 0 ? '+' : ''}${diff.toFixed(2)} ${diff > 0 ? 'ahead' : 'behind'}`;
+    compareHtml = `<div class="helper" style="margin-bottom:14px;">Yours: <strong style="color:var(--text);">${Number(myLatest.cgpa).toFixed(2)}</strong> (${diffLabel})</div>`;
+  }
 
   const rowsHtml = rows.length
     ? rows.map(r => `
@@ -702,11 +801,12 @@ async function lbLoadProfileDetail(profileId, modal) {
       <button class="btn sec sm" onclick="lbCloseProfileDetail()">✕</button>
     </div>
     ${latest ? `
-      <div class="hero-stat" style="--accent-color: var(--acc4); margin-bottom:14px;">
+      <div class="hero-stat" style="--accent-color: var(--acc4); margin-bottom:10px;">
         <div class="lbl">Current CGPA</div>
         <div class="val" style="color:var(--acc4)">${Number(latest.cgpa).toFixed(2)}</div>
         <span class="div-badge">Semester ${latest.semester_number} · verified ${new Date(latest.verified_at).toLocaleDateString()}</span>
       </div>` : ''}
+    ${compareHtml}
     <div class="card" style="padding:0;overflow:hidden;">
       <table class="thresh-table">
         <thead><tr><th>Sem</th><th>SGPA</th><th>CGPA</th><th>Verified</th></tr></thead>
@@ -758,12 +858,12 @@ function lbRenderSettings() {
         <input type="text" id="lbs-name" value="${escapeHtml(p.display_name)}" style="width:100%;">
       </div>
       <div style="margin-bottom:12px;">
-        <div class="field-lbl" style="margin-bottom:5px;">Last initial</div>
-        <input type="text" id="lbs-lastinitial" maxlength="1" value="${escapeHtml(p.last_initial)}" style="width:80px;">
+        <div class="field-lbl" style="margin-bottom:5px;">Last name</div>
+        <input type="text" id="lbs-lastname" value="${escapeHtml(p.last_name)}" style="width:100%;">
       </div>
       <div class="toggle-row">
         <div>
-          <span class="toggle-lbl">Show my full name instead of "${escapeHtml(p.display_name)} ${escapeHtml(p.last_initial)}."</span>
+          <span class="toggle-lbl">Show my full name instead of "${escapeHtml(p.display_name)} ${escapeHtml((p.last_name || '').charAt(0).toUpperCase())}."</span>
           <span class="toggle-sub">Off by default. You can flip this back off anytime.</span>
         </div>
         <label class="switch">
@@ -774,7 +874,10 @@ function lbRenderSettings() {
       <div class="lb-2col" style="margin:12px 0;">
         <div>
           <div class="field-lbl" style="margin-bottom:5px;">Department</div>
-          <input type="text" id="lbs-dept" value="${escapeHtml(p.department)}" style="width:100%;">
+          <select id="lbs-dept" style="width:100%;">
+            ${!LB_DEPARTMENTS.some(d => d.name === p.department) ? `<option value="${escapeHtml(p.department)}" selected>${escapeHtml(p.department)}</option>` : ''}
+            ${lbDepartmentOptionsHtml(p.department)}
+          </select>
         </div>
         <div>
           <div class="field-lbl" style="margin-bottom:5px;">Degree</div>
@@ -818,7 +921,7 @@ function lbRenderSettings() {
 function lbSettingsDurationChanged() {
   const captured = {
     name: document.getElementById('lbs-name').value,
-    lastinitial: document.getElementById('lbs-lastinitial').value,
+    lastname: document.getElementById('lbs-lastname').value,
     fullname: document.getElementById('lbs-fullname').checked,
     dept: document.getElementById('lbs-dept').value,
     degree: document.getElementById('lbs-degree').value,
@@ -833,7 +936,7 @@ function lbSettingsDurationChanged() {
   _lbProfile = original; // not persisted until Save is clicked
 
   document.getElementById('lbs-name').value = captured.name;
-  document.getElementById('lbs-lastinitial').value = captured.lastinitial;
+  document.getElementById('lbs-lastname').value = captured.lastname;
   document.getElementById('lbs-fullname').checked = captured.fullname;
   document.getElementById('lbs-dept').value = captured.dept;
   document.getElementById('lbs-degree').value = captured.degree;
@@ -847,7 +950,7 @@ function lbSettingsDurationChanged() {
 
 async function lbSaveSettings() {
   const display_name = document.getElementById('lbs-name').value.trim();
-  const last_initial = document.getElementById('lbs-lastinitial').value.trim().toUpperCase();
+  const last_name = document.getElementById('lbs-lastname').value.trim();
   const full_name_opt_in = document.getElementById('lbs-fullname').checked;
   const department = document.getElementById('lbs-dept').value.trim();
   const degree_type = document.getElementById('lbs-degree').value.trim();
@@ -855,13 +958,13 @@ async function lbSaveSettings() {
   const program_duration_years = parseInt(document.getElementById('lbs-duration').value, 10);
   const manual_year_override = document.getElementById('lbs-yearoverride').value || null;
 
-  if (!display_name || !last_initial || !department || !degree_type || !admission_year) {
+  if (!display_name || !last_name || !department || !degree_type || !admission_year) {
     showToast('Please fill in every field');
     return;
   }
 
   const { error } = await _lbClient.from('profiles').update({
-    display_name, last_initial, full_name_opt_in, department, degree_type,
+    display_name, last_name, full_name_opt_in, department, degree_type,
     admission_year, program_duration_years, manual_year_override,
     updated_at: new Date().toISOString(),
   }).eq('id', _lbSession.user.id);

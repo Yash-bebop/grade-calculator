@@ -33,7 +33,12 @@
 //                          "approve": there's no pending verification_request
 //                          involved, so this is the only path to fix a typo
 //                          (admin's or student's) without making the student
-//                          re-upload their transcript from scratch.
+//                          re-upload their transcript from scratch. Writes
+//                          an audit row to semester_result_edits before
+//                          applying the change.
+//   - "list_edit_history" -> { result_id } — the audit trail for one
+//                          result: every past edit, old/new values, who
+//                          made it and when.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -171,7 +176,7 @@ Deno.serve(async (req) => {
         .from("semester_results")
         .select(`
           id, profile_id, semester_number, sgpa, cgpa, verified_at, verified_by,
-          profiles ( display_name, last_initial, roll_number, department, admission_year )
+          profiles ( display_name, last_name, roll_number, department, admission_year )
         `);
       if (semester_number != null) query = query.eq("semester_number", semester_number);
       const { data, error } = await query
@@ -187,14 +192,24 @@ Deno.serve(async (req) => {
         return json({ error: "result_id, sgpa, and cgpa are all required" }, 400);
       }
 
-      // Confirms the row exists before writing — an update to a
-      // nonexistent id would otherwise silently affect zero rows.
+      // Fetch current values first — both to confirm the row exists, and
+      // because the audit log needs the "old" side of the diff.
       const { data: existing, error: findErr } = await admin
         .from("semester_results")
-        .select("id")
+        .select("sgpa, cgpa")
         .eq("id", result_id)
         .single();
       if (findErr || !existing) return json({ error: "Result not found" }, 404);
+
+      const { error: logErr } = await admin.from("semester_result_edits").insert({
+        result_id,
+        old_sgpa: existing.sgpa,
+        old_cgpa: existing.cgpa,
+        new_sgpa: sgpa,
+        new_cgpa: cgpa,
+        edited_by: userData.user.id,
+      });
+      if (logErr) return json({ error: "Could not write audit log: " + logErr.message }, 500);
 
       const { error: updateErr } = await admin
         .from("semester_results")
@@ -203,6 +218,19 @@ Deno.serve(async (req) => {
       if (updateErr) return json({ error: updateErr.message }, 500);
 
       return json({ ok: true });
+    }
+
+    if (action === "list_edit_history") {
+      const { result_id } = body;
+      if (!result_id) return json({ error: "result_id is required" }, 400);
+
+      const { data, error } = await admin
+        .from("semester_result_edits")
+        .select("old_sgpa, old_cgpa, new_sgpa, new_cgpa, edited_at, edited_by")
+        .eq("result_id", result_id)
+        .order("edited_at", { ascending: false });
+      if (error) return json({ error: error.message }, 500);
+      return json({ edits: data });
     }
 
     return json({ error: "Unknown action" }, 400);
