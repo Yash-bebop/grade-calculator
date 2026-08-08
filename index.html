@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doon University · Grade Calculator v6.0</title>
+<title>Doon Grade Calculator</title>
+<meta name="description" content="Grade & CGPA calculator for Doon University CSE (NEP 2020) — internal, mid-sem and end-sem, all in one place.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <!-- Vercel Web Analytics — keep this when replacing index.html; it's not auto-injected for plain static sites -->
 <script>
@@ -13,334 +17,356 @@
 </head>
 <body>
 
-<!-- ── NAV ─────────────────────────────────────────── -->
-<nav class="nav">
-  <div class="nav-brand">DOON · NEP 2020</div>
-  <div class="save-indicator" id="save-indicator"><span class="save-dot"></span><span id="save-label">auto-saved</span></div>
-  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
-    <span class="theme-icon icon-sun">☀️</span>
-    <span class="theme-icon icon-moon">🌙</span>
-  </button>
-  <button class="tab-btn active" data-tab="calc" onclick="showTab('calc', this)">
-    <span class="tab-icon">📊</span>
-    <span class="tab-label">Sem Calculator</span>
-  </button>
-  <button class="tab-btn" data-tab="planner" onclick="showTab('planner', this)">
-    <span class="tab-icon">🎯</span>
-    <span class="tab-label">CGPA Planner</span>
-  </button>
-  <button class="tab-btn" data-tab="ref" onclick="showTab('ref', this)">
-    <span class="tab-icon">📋</span>
-    <span class="tab-label">Grade Reference</span>
-  </button>
-  <button class="tab-btn" data-tab="leaderboard" onclick="showTab('leaderboard', this)">
-    <span class="tab-icon">🏆</span>
-    <span class="tab-label">Leaderboard</span>
-  </button>
+<div class="grain" aria-hidden="true"></div>
+<div class="blob-field" aria-hidden="true"><div class="blob blob-a"></div><div class="blob blob-b"></div></div>
 
-  <!-- Mobile-only: hamburger replaces the 3 tabs below 768px so there's
-       nothing to discover by sliding — tap it, a panel of all 3 pages appears. -->
-  <div class="nav-menu-wrap">
-    <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileMenu(event)" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false">
-      <span></span><span></span><span></span>
-    </button>
-  </div>
-</nav>
+<div class="app-header">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand">DOON <span>&middot; GRADES</span></span>
+      <div class="topbar-right">
+        <div class="save-indicator" id="save-indicator"><span class="save-dot"></span><span id="save-label">auto-saved</span></div>
+        <button class="sem-indicator" id="sem-indicator" type="button" data-goto="overview"><span id="sem-indicator-label">No semester selected</span></button>
+        <button class="theme-toggle" id="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Switch theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 12H1.8M22.2 12h-2.4M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 13.5A8 8 0 1 1 10.6 3.2a6.4 6.4 0 0 0 8.4 10.3Z"/></svg>
+        </button>
+        <button class="hamburger-btn" id="hamburger-btn" type="button" onclick="toggleMobileMenu(event)" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false" aria-controls="mobile-menu-panel">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <nav class="tabbar" role="tablist" aria-label="Sections">
+    <div class="tabbar-inner">
+      <button class="tab-btn active" data-tab="overview" type="button" role="tab">Overview</button>
+      <button class="tab-btn" data-tab="calculator" type="button" role="tab">Calculator</button>
+      <button class="tab-btn" data-tab="planner" type="button" role="tab">CGPA Planner</button>
+      <button class="tab-btn" data-tab="reference" type="button" role="tab">Reference</button>
+      <button class="tab-btn" data-tab="leaderboard" type="button" role="tab">Leaderboard</button>
+      <div class="tab-indicator" id="tab-indicator"></div>
+    </div>
+  </nav>
+  <div class="sem-switcher-bar" id="sem-switcher-bar"><div class="sem-switcher-inner"></div></div>
+</div>
+
+<!-- Mobile nav — hamburger replaces the scrolling tab row below the
+     breakpoint (most users here are on phones), so every section is
+     reachable in one tap instead of a horizontal swipe. Lives at body
+     level, not nested in .app-header, so its fixed overlay/drawer can't
+     get clipped by any ancestor's overflow. -->
 <div class="mobile-menu-overlay" id="mobile-menu-overlay" onclick="closeMobileMenu()"></div>
-<div class="mobile-menu-panel" id="mobile-menu-panel" role="menu">
-  <button class="menu-item active" data-tab="calc" onclick="showTab('calc', this)" role="menuitem">
-    <span class="tab-icon">📊</span><span>Sem Calculator</span>
-  </button>
-  <button class="menu-item" data-tab="planner" onclick="showTab('planner', this)" role="menuitem">
-    <span class="tab-icon">🎯</span><span>CGPA Planner</span>
-  </button>
-  <button class="menu-item" data-tab="ref" onclick="showTab('ref', this)" role="menuitem">
-    <span class="tab-icon">📋</span><span>Grade Reference</span>
-  </button>
-  <button class="menu-item" data-tab="leaderboard" onclick="showTab('leaderboard', this)" role="menuitem">
-    <span class="tab-icon">🏆</span><span>Leaderboard</span>
-  </button>
+<div class="mobile-menu-panel" id="mobile-menu-panel" role="menu" aria-label="Sections">
+  <button class="menu-item active" data-tab="overview" type="button" role="menuitem">Overview</button>
+  <button class="menu-item" data-tab="calculator" type="button" role="menuitem">Calculator</button>
+  <button class="menu-item" data-tab="planner" type="button" role="menuitem">CGPA Planner</button>
+  <button class="menu-item" data-tab="reference" type="button" role="menuitem">Reference</button>
+  <button class="menu-item" data-tab="leaderboard" type="button" role="menuitem">Leaderboard</button>
 </div>
 
-<!-- Sem Switcher Bar (persistent, below nav) -->
-<div id="sem-switcher-bar" class="sem-switcher-bar" style="display:none;"></div>
+<main class="app-main">
 
-<!-- ══════════════════════════════════════════════════
-     ONBOARDING (shown only on first visit)
-══════════════════════════════════════════════════ -->
-<div id="onboarding" style="display:none;">
-  <div class="onboarding-wrap">
-    <div class="onboarding-logo">Doon University · CSE · NEP 2020</div>
-    <div class="onboarding-title">Your grade calculator,<br>set up in 10 seconds.</div>
-    <div class="onboarding-sub">Pick your current semester and your courses load automatically. Just enter your marks.</div>
-
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Which semester are you in?</div>
-    <div class="sem-grid">
-      <button class="sem-btn" onclick="quickSetup(1)">Sem 1<span class="sem-label">1st Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(2)">Sem 2<span class="sem-label">1st Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(3)">Sem 3<span class="sem-label">2nd Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(4)">Sem 4<span class="sem-label">2nd Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(5)">Sem 5<span class="sem-label">3rd Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(6)">Sem 6<span class="sem-label">3rd Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(7)">Sem 7<span class="sem-label">Final Year</span></button>
-      <button class="sem-btn" onclick="quickSetup(8)">Sem 8<span class="sem-label">Final Year</span></button>
-    </div>
-
-    <div class="onboarding-divider">or</div>
-    <button class="btn sec" style="width:100%;" onclick="skipOnboarding()">Start with a blank slate — I'll add courses manually</button>
-
-    <div class="onboarding-note">
-      ✦ Your data stays in your browser — nothing is sent anywhere.<br>
-      ✦ All your marks auto-save as you type.<br>
-      ✦ You can edit course names, credits, and marking schemes per course.
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════
-     MAIN CONTENT (hidden until onboarding done)
-══════════════════════════════════════════════════ -->
-<div id="main-content" style="display:none;">
-
-<!-- ══════════════════════════════════════════════════
-     TAB 1 · SEM CALCULATOR
-══════════════════════════════════════════════════ -->
-<div class="panel active" id="tab-calc">
-
-  <!-- Hero stats -->
-  <div class="hero-grid">
-    <div class="hero-stat" style="--accent-color: var(--acc)">
-      <div class="lbl">Sem SGPA</div>
-      <div class="val" id="h-sgpa" style="color:var(--acc)">—</div>
-      <span class="div-badge" id="h-sgpa-div">add courses</span>
-    </div>
-    <div class="hero-stat" style="--accent-color: var(--acc2)">
-      <div class="lbl">Credit Points</div>
-      <div class="val" id="h-pts" style="color:var(--acc2)">—</div>
-      <div class="sub-pts" id="h-credits">/ 0 credits</div>
-    </div>
-    <!-- v5.5: On Sem 1 shows "Sem 1 only" info; from Sem 2+ shows CGPA -->
-    <div class="hero-stat" id="hero-cgpa-card" style="--accent-color: var(--acc4)">
-      <div class="lbl" id="h-cgpa-lbl">CGPA (all sems)</div>
-      <div class="val" id="h-cgpa" style="color:var(--acc4)">—</div>
-      <span class="div-badge" id="h-cgpa-div">set prev below</span>
-    </div>
-  </div>
-
-  <!-- v5.5: Hidden on Sem 1 via updateSem1UI() -->
-  <div id="prev-sem-section">
-  <!-- Previous semester data (Fix #8 — helper text added) -->
-  <div class="sec-head">Previous Semester Data</div>
-  <!-- v5.4: Auto-filled from saved sem slots — shows origin -->
-  <div id="crosssem-banner" style="display:none;" class="crosssem-banner">
-    <span class="cs-icon">⚡</span>
-    <div>
-      <b id="cs-text">Auto-computed from your saved semesters</b>
-      <span class="cs-override" id="cs-sub">You can still edit the fields below to override.</span>
-    </div>
-  </div>
-  <div class="card">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-      <div>
-        <div class="field-lbl" style="margin-bottom:5px;">Credits Earned (all prev sems)</div>
-        <input type="number" id="prev-credits" value="" min="0" placeholder="e.g. 22" oninput="onPrevFieldEdit()">
-        <div class="helper">Your marksheet → "Total Credits"</div>
+  <!-- ══════════════ OVERVIEW ══════════════ -->
+  <section class="tab-panel active" id="tab-overview">
+    <div class="sem-picker" id="onboarding-gate">
+      <span class="section-kicker" id="sem-picker-kicker">Get started</span>
+      <h1 class="ob-title" id="sem-picker-title">Which semester are you in?</h1>
+      <p class="ob-sub" id="sem-picker-sub">Pick one and we'll load the right course list and marking scheme for it. Nothing is filled in for you.</p>
+      <div class="sem-pills" id="sem-pills">
+        <button class="sem-pill" data-sem="1" type="button">Sem 1<span>7 courses</span></button>
+        <button class="sem-pill" data-sem="2" type="button">Sem 2<span>6 courses</span></button>
+        <button class="sem-pill" data-sem="3" type="button">Sem 3<span>7 courses</span></button>
+        <button class="sem-pill" data-sem="4" type="button">Sem 4<span>7 courses</span></button>
+        <button class="sem-pill" data-sem="5" type="button">Sem 5<span>6 courses</span></button>
+        <button class="sem-pill" data-sem="6" type="button">Sem 6<span>6 courses</span></button>
+        <button class="sem-pill" data-sem="7" type="button">Sem 7<span>5 courses</span></button>
+        <button class="sem-pill" data-sem="8" type="button">Sem 8<span>5 courses</span></button>
       </div>
-      <div>
-        <div class="field-lbl" style="margin-bottom:5px;">Credit Points (all prev sems)</div>
-        <input type="number" id="prev-points" value="" min="0" placeholder="e.g. 177" oninput="onPrevFieldEdit()">
-        <div class="helper">Credits × Grade Points, summed across all subjects</div>
+      <button class="btn btn-ghost sm ob-skip" type="button" onclick="skipOnboarding()">Skip — I'll add courses myself</button>
+    </div>
+
+    <div class="dashboard" id="dashboard" hidden>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="stat-label">This semester</div>
+          <div class="stat-value" id="dash-sgpa">&mdash;</div>
+          <div class="liquid-meter thick" id="dash-sgpa-meter">
+            <svg class="liquid-wave" viewBox="0 0 600 20" preserveAspectRatio="none"><path d="M0,10 C150,20 150,0 300,10 C450,20 450,0 600,10 L600,20 L0,20 Z"/></svg>
+            <div class="liquid-fill"></div>
+          </div>
+        </div>
+        <div class="dash-card">
+          <div class="stat-label">CGPA <span>all semesters so far</span></div>
+          <div class="stat-value" id="dash-cgpa">&mdash;</div>
+          <div class="liquid-meter thick" id="dash-cgpa-meter">
+            <svg class="liquid-wave" viewBox="0 0 600 20" preserveAspectRatio="none"><path d="M0,10 C150,20 150,0 300,10 C450,20 450,0 600,10 L600,20 L0,20 Z"/></svg>
+            <div class="liquid-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="formula-explainer">
+        <div class="fe-head">
+          <h2>How your grade is built</h2>
+          <p>Internal, mid-sem and end-sem each fill their own share of the total — nothing about the formula is guessed.</p>
+        </div>
+        <div class="vessel-row">
+          <div class="vessel-group">
+            <div class="vessel" style="--level:90%;--gc:var(--aqua)"><svg class="liquid-wave" viewBox="0 0 600 14" preserveAspectRatio="none"><path d="M0,7 C150,14 150,0 300,7 C450,14 450,0 600,7 L600,14 L0,14 Z"/></svg><div class="liquid-fill"></div></div>
+            <div class="vessel-label">Internal<span>18 / 20</span></div>
+          </div>
+          <div class="vessel-op">+</div>
+          <div class="vessel-group">
+            <div class="vessel" style="--level:90%;--gc:var(--sky)"><svg class="liquid-wave" viewBox="0 0 600 14" preserveAspectRatio="none"><path d="M0,7 C150,14 150,0 300,7 C450,14 450,0 600,7 L600,14 L0,14 Z"/></svg><div class="liquid-fill"></div></div>
+            <div class="vessel-label">Mid-sem &rarr;15<span>13.5 / 15</span></div>
+          </div>
+          <div class="vessel-op">+</div>
+          <div class="vessel-group">
+            <div class="vessel" style="--level:76%;--gc:var(--deepblue)"><svg class="liquid-wave" viewBox="0 0 600 14" preserveAspectRatio="none"><path d="M0,7 C150,14 150,0 300,7 C450,14 450,0 600,7 L600,14 L0,14 Z"/></svg><div class="liquid-fill"></div></div>
+            <div class="vessel-label">End-sem<span>38 / 50</span></div>
+          </div>
+          <div class="vessel-op">=</div>
+          <div class="vessel-group">
+            <div class="vessel vessel--lg" style="--level:82%;--gc:var(--emerald)"><svg class="liquid-wave" viewBox="0 0 600 16" preserveAspectRatio="none"><path d="M0,8 C150,16 150,0 300,8 C450,16 450,0 600,8 L600,16 L0,16 Z"/></svg><div class="liquid-fill"></div></div>
+            <div class="vessel-label">Total<span>81.8 / 100</span></div>
+          </div>
+        </div>
+        <div class="formula-strip">18 + (27 &divide; 30 &times; 15) + 38 = 69.5 / 85 &rarr; 81.8% &rarr; A+</div>
+        <span class="fe-example-tag">Example course &mdash; halved mid-sem mode</span>
+      </div>
+
+      <div class="quicklinks">
+        <button class="quick-card" data-goto="calculator" type="button"><b>Open the calculator &rarr;</b><span>Enter marks, drag end-sem, watch grades update live.</span></button>
+        <button class="quick-card" data-goto="planner" type="button"><b>CGPA planner &rarr;</b><span>Log past semesters and see the SGPA you need this semester.</span></button>
+        <button class="quick-card" data-goto="leaderboard" type="button"><b>Leaderboard &rarr;</b><span>Opt in to compare your CGPA with your batch, once verified.</span></button>
       </div>
     </div>
-    <div style="margin-top:8px;" id="prev-sgpa-check"></div>
-  </div>
-  </div><!-- /prev-sem-section -->
+  </section>
 
-  <!-- Global settings + actions -->
-  <div class="sec-head">Semester Courses</div>
-  <div class="card">
-    <div class="toggle-row">
-      <div>
-        <span class="toggle-lbl">Mid-sem contributes half weight</span>
-        <span class="toggle-sub">ON → MidSem/30 counts as max 15 marks (common at Doon Univ)</span>
+  <!-- ══════════════ CALCULATOR ══════════════ -->
+  <section class="tab-panel" id="tab-calculator">
+    <div class="calc-guard" id="calc-guard">
+      <span class="section-kicker">Almost there</span>
+      <h1 class="ob-title">Pick a semester first</h1>
+      <p class="ob-sub">Head to Overview and choose which semester you're calculating — courses and credits load automatically once you do.</p>
+      <button class="btn btn-primary" type="button" data-goto="overview">Go to Overview</button>
+    </div>
+
+    <div class="calc-content" id="calc-content" hidden>
+      <div class="calc-head">
+        <div>
+          <div class="section-kicker" id="calc-kicker">Sem &mdash;</div>
+          <h2 class="section-title-sm">Grade calculator</h2>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-ghost sm" type="button" onclick="loadSampleMarks()">Load sample marks</button>
+          <button class="btn btn-primary sm share-card-cta" type="button" onclick="shareCard()">Share card</button>
+          <button class="btn btn-ghost sm" type="button" id="copy-summary-btn" onclick="copySummary()">Copy summary</button>
+          <button class="btn btn-ghost sm" type="button" onclick="exportData()">Download backup</button>
+          <label class="btn btn-ghost sm" for="restore-input" style="cursor:pointer;">Restore<input type="file" id="restore-input" accept="application/json" onchange="importData(this)" hidden></label>
+        </div>
       </div>
-      <label class="switch">
-        <input type="checkbox" id="global-halved" checked onchange="recalcAll()">
-        <span class="slider-sw"></span>
-      </label>
-    </div>
-    <div class="flex-gap" style="margin-top:4px;">
-      <button class="btn" onclick="addCourse()">+ Add Course</button>
-      <button class="btn sec sm danger" onclick="clearCourses()">Clear All</button>
-    </div>
-    <button class="btn share-card-cta" onclick="shareCard()" title="Generate a shareable image card">🖼 Share Card</button>
-    <div class="flex-gap" style="margin-top:8px;">
-      <button class="btn sec sm" id="copy-summary-btn" onclick="copySummary()" title="Copy a plain-text summary to clipboard">📋 Copy Summary</button>
-      <button class="btn sec sm" onclick="exportData()" title="Download all your data as a JSON backup">⬇ Backup</button>
-      <label class="btn sec sm" title="Restore from a previously downloaded backup" style="cursor:pointer;">⬆ Restore<input type="file" accept=".json" onchange="importData(this)" style="display:none;"></label>
-    </div>
-  </div>
 
-  <div id="courses-list"></div>
+      <div class="hero-grid-liquid">
+        <div class="stat stat--lg">
+          <div class="stat-label">Sem SGPA</div>
+          <div class="stat-value" id="h-sgpa">0.00</div>
+          <div class="stat-div-badge" id="h-sgpa-div" style="display:none;"></div>
+          <div class="liquid-meter thick" id="h-sgpa-meter">
+            <svg class="liquid-wave" viewBox="0 0 600 20" preserveAspectRatio="none"><path d="M0,10 C150,20 150,0 300,10 C450,20 450,0 600,10 L600,20 L0,20 Z"/></svg>
+            <div class="liquid-fill"></div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Credit points <span id="h-credits">/ 0 credits</span></div>
+          <div class="stat-value" id="h-pts">0</div>
+        </div>
+        <div class="stat" id="hero-cgpa-card">
+          <div class="stat-label" id="h-cgpa-lbl">CGPA (all sems)</div>
+          <div class="stat-value" id="h-cgpa">&mdash;</div>
+          <div class="stat-div-badge" id="h-cgpa-div" style="display:none;"></div>
+          <div class="liquid-meter" id="h-cgpa-meter"><div class="liquid-fill"></div></div>
+        </div>
+      </div>
 
-  <!-- Threshold table (Fix #5 — chip badges, sticky header) -->
-  <div class="sec-head">End-Sem Targets — What you need to hit each grade</div>
-  <div class="card" style="padding:0;overflow:hidden;">
-    <div class="thresh-wrap">
-      <table class="thresh-table" id="thresh-table">
-        <thead>
-          <tr>
-            <th style="padding-left:14px;">Course</th>
-            <th>Cr</th>
-            <th style="color:#ffd447">B+ (7pts)</th>
-            <th style="color:#47ffe8">A (8pts)</th>
-            <th style="color:#47ffb4">A+ (9pts)</th>
-            <th style="color:#ffd700">O (10pts)</th>
-          </tr>
-        </thead>
-        <tbody id="thresh-body"></tbody>
-      </table>
+      <div id="prev-sem-section">
+        <div class="sec-head-liquid">Previous semester data</div>
+        <div class="prev-sem-panel">
+          <div class="crosssem-banner" id="crosssem-banner">
+            <span class="cs-icon">&#9889;</span>
+            <div><b id="cs-text"></b><span id="cs-sub"></span></div>
+          </div>
+          <div class="prev-sem-grid">
+            <label class="tile"><span class="tile-label">Total credits so far</span><input type="number" id="prev-credits" min="0" oninput="onPrevFieldEdit()"></label>
+            <label class="tile"><span class="tile-label">Total credit points so far</span><input type="number" id="prev-points" min="0" oninput="onPrevFieldEdit()"></label>
+          </div>
+          <div class="prev-sgpa-check" id="prev-sgpa-check"></div>
+        </div>
+      </div>
+
+      <div class="sec-head-liquid">Semester settings</div>
+      <div class="global-halved-row">
+        <div class="toggle-row-liquid" style="padding:0;">
+          <div class="toggle-text"><b>Mid-sem contributes half weight</b><span>ON &rarr; Mid-sem/30 counts as max 15 marks (common at Doon Univ)</span></div>
+          <label class="lswitch"><input type="checkbox" id="global-halved" checked onchange="recalcAll()"><span class="ltrack"><span class="lthumb"></span></span></label>
+        </div>
+      </div>
+
+      <div class="section-sub">
+        <div>
+          <div class="section-title-sm">Your courses</div>
+          <div class="section-note">Tap a course to open it &mdash; credits, marks and the end-sem slider live inside.</div>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-ghost sm" type="button" onclick="clearCourses()">Clear all</button>
+          <button class="btn btn-add sm" type="button" onclick="addCourse()">+ Add course</button>
+        </div>
+      </div>
+      <div class="course-list" id="courses-list"></div>
+
+      <!-- All-courses-at-a-glance version of the per-course "targets"
+           chips above — lets you compare every course's end-sem targets
+           in one scroll instead of opening each card. -->
+      <div class="sec-head-liquid">End-sem targets &mdash; all courses at a glance</div>
+      <div class="esr-wrap">
+        <table class="esr-table" id="thresh-table">
+          <thead>
+            <tr>
+              <th>Course</th>
+              <th>Cr</th>
+              <th style="color:var(--sky)">B+ &middot; 7pt</th>
+              <th style="color:var(--aqua)">A &middot; 8pt</th>
+              <th style="color:var(--mint)">A+ &middot; 9pt</th>
+              <th style="color:var(--emerald)">O &middot; 10pt</th>
+            </tr>
+          </thead>
+          <tbody id="thresh-body"></tbody>
+        </table>
+      </div>
     </div>
-  </div>
-</div>
+  </section>
 
-<!-- ══════════════════════════════════════════════════
-     TAB 2 · CGPA PLANNER
-══════════════════════════════════════════════════ -->
-<div class="panel" id="tab-planner">
-  <div class="info-box">
-    <b>How to use:</b> Add your past semester results, set current semester credits + your target CGPA — and the calculator tells you exactly what SGPA you need to hit it this semester.
-  </div>
+  <!-- ══════════════ CGPA PLANNER ══════════════ -->
+  <section class="tab-panel" id="tab-planner">
+    <div class="planner-intro">
+      <div class="section-kicker">Manual planning tool</div>
+      <h2 class="section-title-sm">CGPA planner</h2>
+      <p>Log the credits and credit-points you've already banked from completed semesters, set a target CGPA, and see the exact SGPA you need <em>this</em> semester to hit it. This is independent from the auto-computed CGPA on the Calculator tab &mdash; it's a manual what-if tool.</p>
+    </div>
 
-  <div class="sec-head">Past Semester Results</div>
-  <div class="card">
-    <div class="prev-sem-row" style="margin-bottom:10px;">
-      <span class="ph">Semester</span>
-      <span class="ph">Credits</span>
-      <span class="ph">Cr. Pts</span>
-      <span class="ph">SGPA</span>
-      <span></span>
+    <div class="sec-head-liquid">Past semesters</div>
+    <div class="planner-table">
+      <div class="pt-row pt-row--head"><span>Sem</span><span>Credits</span><span>Cr. Pts</span><span>SGPA</span><span></span></div>
     </div>
     <div id="past-sems-list"></div>
-    <button class="btn sec sm" onclick="addPastSem()" style="margin-top:8px;">+ Add Semester</button>
-  </div>
-
-  <div class="sec-head">Current Semester</div>
-  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-    <div>
-      <div class="field-lbl" style="margin-bottom:5px;">Current Sem Credits</div>
-      <input type="number" id="cur-credits-plan" value="22" min="1" oninput="calcPlan()">
+    <div class="planner-actions">
+      <button class="btn btn-ghost sm" type="button" onclick="addPastSem()">+ Add past semester</button>
     </div>
-    <div>
-      <div class="field-lbl" style="margin-bottom:5px;">Target CGPA</div>
-      <input type="number" id="target-cgpa" value="8.00" min="0" max="10" step="0.01" oninput="calcPlan()">
-      <div class="helper">8.00+ = Distinction · 6.00+ = First Div</div>
-    </div>
-  </div>
 
-  <div class="sec-head">Required SGPA</div>
-  <div class="card" id="plan-result">
-    <div style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;">
-      Add past semesters and set a target to see your required SGPA.
+    <div class="sec-head-liquid">This semester &amp; target</div>
+    <div class="planner-current">
+      <label class="tile"><span class="tile-label">Current semester credits</span><input type="number" id="cur-credits-plan" min="0" value="22" oninput="calcPlan()"></label>
+      <label class="tile"><span class="tile-label">Target CGPA</span><input type="number" id="target-cgpa" step="0.01" min="0" max="10" value="8.00" oninput="calcPlan()"></label>
+    </div>
+    <div class="planner-result" id="plan-result">Set current semester credits to see the result.</div>
+  </section>
+
+  <!-- ══════════════ GRADE REFERENCE ══════════════ -->
+  <section class="tab-panel" id="tab-reference">
+    <div class="section-kicker">NEP 2020</div>
+    <h2 class="section-title-sm">Grading scale</h2>
+    <div class="grade-ref-grid">
+      <div class="gr-item"><div class="gr-letter" style="color:var(--emerald)">O</div><div class="gr-pts">10 pts</div><div class="gr-range">90&ndash;100</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--mint)">A+</div><div class="gr-pts">9 pts</div><div class="gr-range">80&ndash;89</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--aqua)">A</div><div class="gr-pts">8 pts</div><div class="gr-range">70&ndash;79</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--sky)">B+</div><div class="gr-pts">7 pts</div><div class="gr-range">60&ndash;69</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--deepblue)">B</div><div class="gr-pts">6 pts</div><div class="gr-range">50&ndash;59</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--amber)">C</div><div class="gr-pts">5 pts</div><div class="gr-range">40&ndash;49</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--coral)">D</div><div class="gr-pts">4 pts</div><div class="gr-range">30&ndash;39</div></div>
+      <div class="gr-item"><div class="gr-letter" style="color:var(--red)">F</div><div class="gr-pts">0 pts</div><div class="gr-range">Below 30</div></div>
+    </div>
+
+    <div class="sec-head-liquid">Divisions</div>
+    <div class="div-table-liquid">
+      <div class="div-row"><span>CGPA &ge; 8.00</span><b style="color:var(--emerald)">&#9733; First Division with Distinction</b><span class="note">Must clear all courses in first attempt</span></div>
+      <div class="div-row"><span>CGPA 6.00&ndash;7.99</span><b style="color:var(--aqua)">First Division</b><span class="note"></span></div>
+      <div class="div-row"><span>CGPA 5.00&ndash;5.99</span><b style="color:var(--amber)">Second Division</b><span class="note"></span></div>
+      <div class="div-row"><span>CGPA 4.00&ndash;4.99</span><b style="color:var(--text-dim)">Pass</b><span class="note"></span></div>
+      <div class="div-row"><span>Below 4.00</span><b style="color:var(--red)">Fail</b><span class="note">Repeat year if after even sem</span></div>
+    </div>
+
+    <div class="sec-head-liquid">Evaluation structure</div>
+    <div class="ref-card">
+      <b>Mid-sem halved (most common)</b>
+      <div>Internal /20 + Mid-sem/30 &rarr; capped at 15 + End-sem /50 or /70 &rarr; scaled to /100</div>
+    </div>
+    <div class="ref-card">
+      <b>Mid-sem at full value</b>
+      <div>Internal(20) + Mid-sem(30) + End-sem(50) = 100 &mdash; only when mid-sem is <em>not</em> halved</div>
+    </div>
+    <div class="ref-card">
+      <b>Mid-sem not held (teacher awards)</b>
+      <div>Teacher directly awards up to 30 marks. Total raw = Internal(20) + Teacher(30) + End-sem(70) = 120 &rarr; scaled to 100</div>
+      <ul style="margin-top:10px;">
+        <li><b>SGPA</b> = Grade points &times; Credits &divide; Total credits (this semester)</li>
+        <li><b>CGPA</b> = Cumulative points &divide; Cumulative credits</li>
+        <li><b>Equivalent %</b> = CGPA &times; 10</li>
+      </ul>
+    </div>
+
+    <div class="sec-head-liquid">Promotion rules</div>
+    <div class="ref-card">
+      <ul>
+        <li>Odd &rarr; Even semester: promoted regardless of CGPA.</li>
+        <li>Even semester (2nd/4th): must achieve <b>CGPA &ge; 4.00</b> to continue.</li>
+        <li>Below 4.00 after even semester &rarr; must repeat the academic year.</li>
+        <li>No make-up exams. No grace marks.</li>
+        <li>Grade improvement: only for C or D, after program completion, within 1 year.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ══════════════ LEADERBOARD ══════════════
+       Rendered entirely by leaderboard.js, fetched lazily the first
+       time this tab opens (see lbBootstrap() in script.js). Nothing
+       here talks to Supabase until someone actively opens this tab.
+       This file's only job is to re-skin whatever leaderboard.js
+       renders — see the "LEADERBOARD COMPATIBILITY LAYER" section
+       at the bottom of styles.css. -->
+  <section class="tab-panel" id="tab-leaderboard">
+    <div class="card empty-state"><div class="empty-title">Loading leaderboard&hellip;</div></div>
+  </section>
+
+</main>
+
+<footer class="site-footer">Made by <strong>Yashvardhan Dobhal</strong> &middot; CSE&rsquo;29 &middot; Doon University</footer>
+
+<div class="toast" id="toast"></div>
+
+<!-- Share card modal — canvas is drawn/sized entirely in script.js
+     (shareCardDraw); this markup just hosts it. -->
+<div class="share-modal" id="share-modal" onclick="if(event.target===this) closeShareModal()">
+  <div class="share-modal-card">
+    <div class="share-modal-head">
+      <h3>Your grade card</h3>
+      <button class="modal-close" type="button" onclick="closeShareModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="share-canvas-wrap">
+      <canvas id="share-canvas"></canvas>
+    </div>
+    <div class="share-modal-actions">
+      <div class="share-theme-toggle" role="group" aria-label="Card theme">
+        <button class="share-theme-btn" id="share-theme-dark" type="button" onclick="setShareCardTheme('dark')">Dark</button>
+        <button class="share-theme-btn" id="share-theme-light" type="button" onclick="setShareCardTheme('light')">Light</button>
+      </div>
+      <div class="share-modal-buttons">
+        <button class="btn btn-ghost sm" type="button" onclick="copyCardToClipboard()">Copy image</button>
+        <button class="btn btn-primary sm" type="button" onclick="downloadCard()">Download</button>
+      </div>
     </div>
   </div>
 </div>
-
-<!-- ══════════════════════════════════════════════════
-     TAB 3 · GRADE REFERENCE
-══════════════════════════════════════════════════ -->
-<div class="panel" id="tab-ref">
-  <div class="sec-head">Grading Scale — NEP 2020</div>
-  <div class="grade-ref" style="margin-bottom:16px;">
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--gold)">O</div><div class="gr-pts">10 pts</div><div class="gr-range">90 – 100</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--green)">A+</div><div class="gr-pts">9 pts</div><div class="gr-range">80 – 89</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc4)">A</div><div class="gr-pts">8 pts</div><div class="gr-range">70 – 79</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc2)">B+</div><div class="gr-pts">7 pts</div><div class="gr-range">60 – 69</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--yellow)">B</div><div class="gr-pts">6 pts</div><div class="gr-range">50 – 59</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--orange)">C</div><div class="gr-pts">5 pts</div><div class="gr-range">40 – 49</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--acc3)">D</div><div class="gr-pts">4 pts</div><div class="gr-range">30 – 39</div></div>
-    <div class="grade-ref-item"><div class="gr-letter" style="color:var(--red)">F</div><div class="gr-pts">0 pts</div><div class="gr-range">Below 30</div></div>
-  </div>
-
-  <div class="sec-head">Divisions</div>
-  <div class="card" style="padding:0;overflow:hidden;">
-    <table class="div-table">
-      <tr><td>CGPA ≥ 8.00</td><td style="color:var(--green);font-weight:700;">★ First Division with Distinction</td><td style="color:var(--muted);font-size:10px;">Must clear all courses in first attempt</td></tr>
-      <tr><td>CGPA 6.00 – 7.99</td><td style="color:var(--acc4);font-weight:700;">First Division</td><td></td></tr>
-      <tr><td>CGPA 5.00 – 5.99</td><td style="color:var(--yellow);font-weight:700;">Second Division</td><td></td></tr>
-      <tr><td>CGPA 4.00 – 4.99</td><td style="color:var(--muted);font-weight:600;">Pass</td><td></td></tr>
-      <tr><td>CGPA below 4.00</td><td style="color:var(--red);font-weight:700;">Fail</td><td style="color:var(--muted);font-size:10px;">Repeat year if after even sem</td></tr>
-    </table>
-  </div>
-
-  <div class="sec-head">Evaluation Structure</div>
-  <div class="card">
-    <div class="info-box" style="margin-bottom:8px;">
-      <b>Mid-sem HALVED (most common):</b><br>
-      Internal /20 + MidSem/30 → capped at 15 + EndSem /50 or /70 → scaled to /100
-    </div>
-    <div class="info-box" style="margin-bottom:8px;">
-      <b>Mid-sem at full value:</b><br>
-      Internal(20) + MidSem(30) + EndSem(50) = 100 — only when mid-sem is NOT halved
-    </div>
-    <div class="info-box" style="margin-bottom:0;">
-      <b>Mid-sem not held (teacher awards):</b><br>
-      Teacher directly awards up to 30 marks. Total raw = Internal(20) + Teacher(30) + EndSem(70) = 120 → scaled to 100<br><br>
-      <b>SGPA</b> = Grade points × Credits ÷ Total credits (this semester)<br>
-      <b>CGPA</b> = Cumulative points ÷ Cumulative credits<br>
-      <b>Equivalent %</b> = CGPA × 10
-    </div>
-  </div>
-
-  <div class="sec-head">Promotion Rules</div>
-  <div class="card">
-    <div class="info-box" style="margin-bottom:0;">
-      • Odd → Even semester: promoted regardless of CGPA.<br>
-      • Even semester (2nd/4th): must achieve <b>CGPA ≥ 4.00</b> to continue.<br>
-      • Below 4.00 after even semester → must repeat the academic year.<br>
-      • No make-up exams. No grace marks.<br>
-      • Grade improvement: only for C or D, after program completion, within 1 year.
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════
-     TAB 4 · LEADERBOARD (opt-in — separate from the calculator)
-     Content is rendered entirely by leaderboard.js, which is fetched
-     lazily the first time this tab opens. Nothing here talks to any
-     server until a person actively opens this tab.
-══════════════════════════════════════════════════ -->
-<div class="panel" id="tab-leaderboard">
-  <div class="card empty-state"><div class="empty-title">Open this tab to load the leaderboard</div></div>
-</div>
-</div><!-- /main-content -->
-
-<footer class="site-footer">
-  Made by <strong>Yashvardhan Dobhal</strong> · CSE'29 · Doon University
-</footer>
 
 <script src="script.js"></script>
-<!-- ══════════════════════════════════════════════════
-     SHARE CARD MODAL
-══════════════════════════════════════════════════ -->
-<div id="share-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);overflow-y:auto;padding:24px 16px;">
-  <div style="max-width:420px;margin:0 auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--acc);letter-spacing:2px;text-transform:uppercase;">Share Card</span>
-      <button onclick="closeShareModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px;">✕</button>
-    </div>
-    <div class="share-theme-toggle">
-      <button id="share-theme-light" class="share-theme-btn" onclick="setShareCardTheme('light')">☀️ Light</button>
-      <button id="share-theme-dark" class="share-theme-btn" onclick="setShareCardTheme('dark')">🌙 Dark</button>
-    </div>
-    <canvas id="share-canvas" style="width:100%;border-radius:12px;display:block;"></canvas>
-    <div style="display:flex;gap:10px;margin-top:14px;">
-      <button class="btn" style="flex:1;" onclick="downloadCard()">⬇ Download Image</button>
-      <button class="btn sec" style="flex:1;" onclick="copyCardToClipboard()">📋 Copy to Clipboard</button>
-    </div>
-    <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);text-align:center;">1080 × 1920 px · sized for WhatsApp / Instagram status</div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
 </body>
 </html>
